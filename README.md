@@ -37,13 +37,14 @@ the keyboard feel broken.
 |-----------|---------------|--------|
 | OpenAI    | ✅ `gpt-4o-mini-transcribe` | ✅ `gpt-4o-mini` |
 | Mistral   | ✅ `voxtral-mini-latest`    | ✅ `mistral-small-latest` |
-| Anthropic | ❌ *not possible*           | ✅ `claude-haiku-4-5` (default) |
 
-**Anthropic cannot transcribe.** Claude's Messages API accepts text, images
-and documents — there is no audio content block and no speech-to-text
-endpoint. So audio must go to OpenAI or Mistral; Claude handles the language
-work it is actually good at. Every provider is swappable per stage, and any
-model can be overridden by name in settings.
+Either provider can serve either stage independently, and any model can be
+overridden by name in settings.
+
+Note on model names: of the Voxtral family, only `voxtral-mini-*` reports
+`audio_transcription` capability. `voxtral-small-latest` does **not**
+transcribe despite the name, so overriding the Mistral model carelessly will
+break dictation. A unit test guards the default.
 
 ## Quick actions
 
@@ -95,3 +96,39 @@ appends instead of overwriting your edit.
 **Prompt discipline.** Both prompts explicitly forbid the model answering,
 acting on, or translating the content — dictating "what time is the meeting?"
 must yield that question, not an answer to it.
+
+## Model selection
+
+Both stages offer a dropdown of curated models plus a **Custom…** option for
+any model ID. Blank means "provider default", so defaults can improve without
+stranding you on an old pin.
+
+### A note on Mistral tiers
+
+Mistral gates larger models by subscription tier, and reports it as
+`HTTP 429 Rate limit exceeded` — which reads like throttling but really means
+"not included in your plan". Empirically, on a low tier:
+
+| Model | Result |
+|---|---|
+| `ministral-3b/8b/14b-latest`, `open-mistral-nemo` | ✅ work |
+| `mistral-small-latest`, `mistral-medium-latest`, `magistral-small-latest` | ❌ 429 |
+| `mistral-large-latest` | ❌ 403 "not available in your subscription tier" |
+
+The 403 on `large` is what gives the game away: the 429s are the same gating
+with a friendlier status code. This is observed behaviour, not documented
+policy. **Test connection** in settings tells you which bucket you are in.
+
+## Status
+
+Verified working on a Pixel 10 (Android 17):
+
+- IME registers, is selectable, renders without crashing
+- Settings, permissions, encrypted key storage
+- Live HTTPS calls to Mistral; errors surface as readable text
+- WAV format accepted by the transcription endpoint (HTTP 200)
+- Clean-up prompt: 8/8 on a tricky-transcript suite against the real API
+- 22 unit tests
+
+Not yet verified end to end: speaking into the mic and getting polished text
+back, which needs a working transcription tier plus a human voice.

@@ -40,7 +40,6 @@ class Polisher(private val settings: Settings) {
         withContext(Dispatchers.IO) {
             if (user.isBlank()) return@withContext user
             when (override ?: settings.polishProvider) {
-                PolishProvider.ANTHROPIC -> anthropic(system, user, modelFor(PolishProvider.ANTHROPIC, override))
                 PolishProvider.OPENAI -> openAi(system, user, modelFor(PolishProvider.OPENAI, override))
                 PolishProvider.MISTRAL -> mistral(system, user, modelFor(PolishProvider.MISTRAL, override))
                 PolishProvider.NONE -> user
@@ -62,42 +61,6 @@ class Polisher(private val settings: Settings) {
     /** Output cap scaled to input: rewrites are never much longer than source. */
     private fun maxTokens(user: String): Int =
         (user.length / 2).coerceIn(256, 4096)
-
-    // ---- Anthropic ------------------------------------------------------
-
-    private fun anthropic(system: String, user: String, model: String): String {
-        val key = settings.anthropicKey
-        if (key.isBlank()) throw TyvoException("Add an Anthropic API key in Tyvo settings.")
-
-        val payload = JSONObject().apply {
-            put("model", model)
-            put("max_tokens", maxTokens(user))
-            put("system", system)
-            put("temperature", 0)
-            put(
-                "messages",
-                JSONArray().put(
-                    JSONObject().put("role", "user").put("content", user)
-                ),
-            )
-        }
-
-        val req = Request.Builder()
-            .url("https://api.anthropic.com/v1/messages")
-            .addHeader("x-api-key", key)
-            .addHeader("anthropic-version", ANTHROPIC_VERSION)
-            .post(payload.toString().toRequestBody(JSON))
-            .build()
-
-        val json = Http.json(req, "Polish")
-        val blocks = json.optJSONArray("content") ?: return user
-        val sb = StringBuilder()
-        for (i in 0 until blocks.length()) {
-            val b = blocks.optJSONObject(i) ?: continue
-            if (b.optString("type") == "text") sb.append(b.optString("text"))
-        }
-        return sb.toString().trim().ifBlank { user }
-    }
 
     // ---- OpenAI ---------------------------------------------------------
 
@@ -165,14 +128,11 @@ class Polisher(private val settings: Settings) {
 
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
-        private const val ANTHROPIC_VERSION = "2023-06-01"
 
-        const val DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-        const val DEFAULT_MISTRAL_MODEL = "mistral-small-latest"
+        const val DEFAULT_MISTRAL_MODEL = "ministral-3b-latest"
 
         fun defaultModelFor(p: PolishProvider): String = when (p) {
-            PolishProvider.ANTHROPIC -> DEFAULT_ANTHROPIC_MODEL
             PolishProvider.OPENAI -> DEFAULT_OPENAI_MODEL
             PolishProvider.MISTRAL -> DEFAULT_MISTRAL_MODEL
             PolishProvider.NONE -> ""

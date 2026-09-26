@@ -12,6 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.data.PolishProvider
 import com.tyvo.keyboard.data.Settings
+import com.tyvo.keyboard.data.ModelCatalog
+import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
 import com.tyvo.keyboard.data.TranscribeProvider
 import com.tyvo.keyboard.net.ConnectionTest
@@ -55,7 +59,6 @@ class SettingsActivity : ComponentActivity() {
 private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
     val ctx = activity as Context
 
-    var anthropic by remember { mutableStateOf(settings.anthropicKey) }
     var openai by remember { mutableStateOf(settings.openAiKey) }
     var mistral by remember { mutableStateOf(settings.mistralKey) }
     var tProvider by remember { mutableStateOf(settings.transcribeProvider) }
@@ -71,7 +74,7 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
     val scope = rememberCoroutineScope()
 
     // Recomputed on every relevant edit so the warning tracks the live config.
-    val readiness = remember(anthropic, openai, mistral, tProvider, pProvider) {
+    val readiness = remember(openai, mistral, tProvider, pProvider) {
         Readiness.of(settings)
     }
 
@@ -88,6 +91,7 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
     Column(
         Modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -151,9 +155,6 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
-            KeyField("Anthropic", anthropic, showKeys) {
-                anthropic = it; settings.anthropicKey = it
-            }
             KeyField("OpenAI", openai, showKeys) {
                 openai = it; settings.openAiKey = it
             }
@@ -178,19 +179,11 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                 selected = tProvider,
                 onSelect = { tProvider = it; settings.transcribeProvider = it },
             )
-            Text(
-                "Anthropic is not listed: Claude accepts no audio input, so it " +
-                    "cannot transcribe. It is available for polishing below.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = tModel,
-                onValueChange = { tModel = it; settings.transcribeModel = it },
-                label = { Text("Model override") },
-                placeholder = { Text(Transcriber.defaultModelFor(tProvider)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            ModelPicker(
+                options = ModelCatalog.transcribeFor(tProvider),
+                selected = tModel,
+                default = Transcriber.defaultModelFor(tProvider),
+                onSelect = { tModel = it; settings.transcribeModel = it },
             )
         }
 
@@ -207,14 +200,14 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                 selected = pProvider,
                 onSelect = { pProvider = it; settings.polishProvider = it },
             )
-            OutlinedTextField(
-                value = pModel,
-                onValueChange = { pModel = it; settings.polishModel = it },
-                label = { Text("Model override") },
-                placeholder = { Text(Polisher.defaultModelFor(pProvider)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (pProvider != PolishProvider.NONE) {
+                ModelPicker(
+                    options = ModelCatalog.polishFor(pProvider),
+                    selected = pModel,
+                    default = Polisher.defaultModelFor(pProvider),
+                    onSelect = { pModel = it; settings.polishModel = it },
+                )
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
@@ -287,6 +280,102 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Model chooser: a dropdown of curated options plus a "Custom" escape hatch.
+ *
+ * An empty stored value means "use the provider default", which is shown as
+ * the selected entry rather than as a blank field -- a blank model box reads
+ * like something is unconfigured.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelPicker(
+    options: List<ModelOption>,
+    selected: String,
+    default: String,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var custom by remember(selected) {
+        mutableStateOf(selected.isNotBlank() && options.none { it.id == selected })
+    }
+
+    val effective = selected.ifBlank { default }
+    val match = options.firstOrNull { it.id == effective }
+    val display = when {
+        custom -> "Custom"
+        match != null -> match.label + if (selected.isBlank()) " (default)" else ""
+        else -> effective
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+        ) {
+            OutlinedTextField(
+                value = display,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Model") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            )
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { opt ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(
+                                    opt.label + if (opt.id == default) "  (default)" else "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    opt.note,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        onClick = {
+                            custom = false
+                            expanded = false
+                            // Storing blank for the default keeps the app on a
+                            // sane model if we later change what that is.
+                            onSelect(if (opt.id == default) "" else opt.id)
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Custom…", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = { custom = true; expanded = false },
+                )
+            }
+        }
+
+        if (custom) {
+            OutlinedTextField(
+                value = selected,
+                onValueChange = onSelect,
+                label = { Text("Model ID") },
+                placeholder = { Text(default) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium
+                    .copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (match != null) {
+            Text(
+                match.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

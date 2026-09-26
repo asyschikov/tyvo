@@ -17,6 +17,7 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.WindowInsetsCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.ime.UiState
@@ -59,6 +60,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         setBackgroundColor(BG)
         val pad = dp(8)
         setPadding(pad, dp(6), pad, dp(10))
+
+        // Keep the control row clear of the gesture-nav pill.
+        setOnApplyWindowInsetsListener { v, insets ->
+            val bars = WindowInsetsCompat.toWindowInsetsCompat(insets)
+                .getInsets(WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(pad, dp(6), pad, dp(10) + bars.bottom)
+            insets
+        }
 
         // --- status line -------------------------------------------------
         status = TextView(context).apply {

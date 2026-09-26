@@ -15,10 +15,6 @@ import java.io.File
 
 /**
  * Turns a recorded WAV into text.
- *
- * Only OpenAI and Mistral are implemented: Anthropic exposes no
- * speech-to-text endpoint and Claude's Messages API accepts no audio
- * content blocks, so Claude cannot serve as a transcription backend.
  */
 class Transcriber(private val settings: Settings) {
 

@@ -74,8 +74,10 @@ object QuickActions {
     val BULLETS = QuickAction(
         id = "bullets",
         label = "Bullets",
-        instruction = "Restructure as a bullet list, one idea per bullet, using " +
-            "'- ' as the marker. Keep the wording close to the original.",
+        instruction = "Restructure the existing content as a bullet list, one " +
+            "idea per bullet, using '- ' as the marker. Use only ideas already " +
+            "present in the text; invent no new bullets, steps or suggestions. " +
+            "Keep the wording close to the original.",
         group = QuickAction.Group.LENGTH,
     )
 
@@ -102,7 +104,8 @@ object QuickActions {
         label = "Commit",
         instruction = "Rewrite as a git commit message: imperative mood subject " +
             "line under 72 characters, then a blank line and body only if the " +
-            "text warrants one.",
+            "text warrants one. Output the commit message alone: no notes, no " +
+            "explanation of your choices, no markdown fences.",
         group = QuickAction.Group.FORM,
     )
 
@@ -111,7 +114,8 @@ object QuickActions {
         label = "Prompt",
         instruction = "Rewrite as a clear, well-specified instruction addressed to " +
             "an AI assistant: state the goal, constraints and desired output " +
-            "format. Keep the user's intent exactly.",
+            "format. Keep the user's intent exactly. Write the instruction as " +
+            "plain prose with no headings, labels or bold markers.",
         group = QuickAction.Group.FORM,
     )
 
@@ -120,8 +124,10 @@ object QuickActions {
     val PROOFREAD = QuickAction(
         id = "proofread",
         label = "Proofread",
-        instruction = "Fix spelling, grammar and punctuation only. Change no " +
-            "wording, tone or structure beyond what correctness requires.",
+        instruction = "Fix spelling, grammar and punctuation only. Keep every " +
+            "word the speaker used, including informal ones and abbreviations " +
+            "like 'deploy' or 'repo'; do not substitute synonyms or expand " +
+            "shortened words. Change no tone or structure.",
         group = QuickAction.Group.FIX,
     )
 
@@ -129,7 +135,7 @@ object QuickActions {
         id = "punctuate",
         label = "Punctuate",
         instruction = "Add and correct punctuation, capitalisation and paragraph " +
-            "breaks. Do not change any words.",
+            "breaks. Do not change, add, remove or substitute a single word.",
         group = QuickAction.Group.FIX,
     )
 

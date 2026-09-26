@@ -7,8 +7,6 @@ import androidx.security.crypto.MasterKey
 
 /**
  * Provider used to turn recorded audio into text.
- * Anthropic is deliberately absent: Claude has no audio input and no
- * transcription endpoint, so it can only ever be a polish backend.
  */
 enum class TranscribeProvider(val label: String) {
     OPENAI("OpenAI"),
@@ -17,7 +15,6 @@ enum class TranscribeProvider(val label: String) {
 
 /** Provider used for the LLM text-polish / correction pass. */
 enum class PolishProvider(val label: String) {
-    ANTHROPIC("Anthropic"),
     OPENAI("OpenAI"),
     MISTRAL("Mistral"),
     NONE("Off (raw transcript)");
@@ -50,10 +47,6 @@ class Settings(context: Context) {
 
     // ---- API keys -------------------------------------------------------
 
-    var anthropicKey: String
-        get() = secure.getString(KEY_ANTHROPIC, "").orEmpty()
-        set(v) = secure.edit().putString(KEY_ANTHROPIC, v.trim()).apply()
-
     var openAiKey: String
         get() = secure.getString(KEY_OPENAI, "").orEmpty()
         set(v) = secure.edit().putString(KEY_OPENAI, v.trim()).apply()
@@ -68,7 +61,6 @@ class Settings(context: Context) {
     }
 
     fun keyFor(p: PolishProvider): String = when (p) {
-        PolishProvider.ANTHROPIC -> anthropicKey
         PolishProvider.OPENAI -> openAiKey
         PolishProvider.MISTRAL -> mistralKey
         PolishProvider.NONE -> ""
@@ -87,9 +79,9 @@ class Settings(context: Context) {
     var polishProvider: PolishProvider
         get() = runCatching {
             PolishProvider.valueOf(
-                plain.getString(KEY_PP, null) ?: PolishProvider.ANTHROPIC.name
+                plain.getString(KEY_PP, null) ?: PolishProvider.OPENAI.name
             )
-        }.getOrDefault(PolishProvider.ANTHROPIC)
+        }.getOrDefault(PolishProvider.OPENAI)
         set(v) = plain.edit().putString(KEY_PP, v.name).apply()
 
     // ---- Model overrides (blank = provider default) ----------------------
@@ -128,7 +120,6 @@ class Settings(context: Context) {
             .filter { it.isNotEmpty() }
 
     private companion object {
-        const val KEY_ANTHROPIC = "anthropic_key"
         const val KEY_OPENAI = "openai_key"
         const val KEY_MISTRAL = "mistral_key"
         const val KEY_TP = "transcribe_provider"
