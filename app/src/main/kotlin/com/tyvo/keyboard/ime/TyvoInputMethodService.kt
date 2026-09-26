@@ -152,9 +152,14 @@ class TyvoInputMethodService : InputMethodService() {
         val file = recorder.stop()
         haptic()
         if (file == null) {
-            render(stateForIdle().let {
-                UiState.Idle("Too short - hold the mic while speaking.")
-            })
+            // A stray tap should not throw away text still under review.
+            render(
+                if (session.isActive) {
+                    UiState.Review(session.current, session.canUndo, note = "Too short.")
+                } else {
+                    UiState.Idle("Too short - speak while the mic is active.")
+                }
+            )
             return
         }
         process(file)
@@ -198,11 +203,10 @@ class TyvoInputMethodService : InputMethodService() {
                     render(UiState.Review(raw, session.canUndo, note = e.message))
                     return@launch
                 }
-                if (polished != raw) {
-                    replaceCommitted(polished)
+                if (polished != raw && replaceCommitted(polished)) {
                     session.advance(polished)
                 }
-                render(UiState.Review(session.current, session.canUndo))
+                render(reviewOrIdle())
             } catch (e: TyvoException) {
                 render(UiState.Idle(e.message))
             } catch (e: Exception) {
@@ -225,11 +229,10 @@ class TyvoInputMethodService : InputMethodService() {
             render(UiState.Review(text, session.canUndo, busy = true, note = label))
             try {
                 val result = polisher.transform(text, instruction)
-                if (result != text) {
-                    replaceCommitted(result)
+                if (result != text && replaceCommitted(result)) {
                     session.advance(result)
                 }
-                render(UiState.Review(session.current, session.canUndo))
+                render(reviewOrIdle())
             } catch (e: TyvoException) {
                 render(UiState.Review(text, session.canUndo, note = e.message))
             } catch (e: Exception) {
@@ -246,11 +249,10 @@ class TyvoInputMethodService : InputMethodService() {
             render(UiState.Review(text, session.canUndo, busy = true, note = "Polishing"))
             try {
                 val polished = polisher.cleanUp(text)
-                if (polished != text) {
-                    replaceCommitted(polished)
+                if (polished != text && replaceCommitted(polished)) {
                     session.advance(polished)
                 }
-                render(UiState.Review(session.current, session.canUndo))
+                render(reviewOrIdle())
             } catch (e: TyvoException) {
                 render(UiState.Review(text, session.canUndo, note = e.message))
             }
@@ -261,7 +263,7 @@ class TyvoInputMethodService : InputMethodService() {
         val prev = session.undo() ?: return
         replaceCommitted(prev)
         haptic()
-        render(UiState.Review(prev, session.canUndo))
+        render(reviewOrIdle())
     }
 
     private fun acceptSession() {
@@ -294,30 +296,45 @@ class TyvoInputMethodService : InputMethodService() {
      * the user edited it meanwhile -- we append instead of destroying their
      * edit.
      */
-    private fun replaceCommitted(text: String) {
-        val ic = currentInputConnection ?: return
+    /**
+     * Swaps our previously committed text for [text].
+     *
+     * Returns false without touching the field if what sits before the cursor
+     * is no longer exactly what we committed -- the user typed, moved the
+     * caret, or the app rewrote the field. Appending in that case would leave
+     * both versions in the field, which is worse than declining the edit.
+     */
+    private fun replaceCommitted(text: String): Boolean {
+        val ic = currentInputConnection ?: return false
         val prior = committed
+        if (prior.isEmpty()) return false
+
         val leading = prior.takeWhile { it == ' ' }
         val replacement = leading + text.trimStart()
 
         ic.beginBatchEdit()
         val before = ic.getTextBeforeCursor(prior.length, 0)?.toString()
-        if (before == prior) {
+        val matched = before == prior
+        if (matched) {
             ic.deleteSurroundingText(prior.length, 0)
             ic.commitText(replacement, 1)
             committed = replacement
-        } else {
-            // Field diverged from what we wrote; don't clobber the user.
-            ic.commitText(text, 1)
-            committed = text
         }
         ic.endBatchEdit()
+
+        if (!matched) {
+            // Our text is no longer ours to edit; end the session cleanly.
+            session.clear()
+            committed = ""
+        }
+        return matched
     }
 
     private fun needsLeadingSpace(ic: InputConnection): Boolean {
-        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        return before.isNotEmpty() && before.last().isLetterOrDigit() ||
-            before.isNotEmpty() && before.last() in ".,!?;:\""
+        val prev = ic.getTextBeforeCursor(1, 0)?.toString()?.lastOrNull() ?: return false
+        // Join onto a word or a closing mark, but not onto an opening bracket,
+        // an existing space, or a newline.
+        return prev.isLetterOrDigit() || prev in ".,!?;:\")"
     }
 
     private fun backspace() {
@@ -338,6 +355,18 @@ class TyvoInputMethodService : InputMethodService() {
     }
 
     // ---- Misc -----------------------------------------------------------
+
+    /**
+     * Review while we still own text in the field, otherwise idle. Used after
+     * every edit so a session invalidated mid-flight collapses gracefully
+     * instead of offering actions that would do nothing.
+     */
+    private fun reviewOrIdle(note: String? = null): UiState =
+        if (session.isActive) {
+            UiState.Review(session.current, session.canUndo, note = note)
+        } else {
+            UiState.Idle(note ?: "Text is no longer editable here.")
+        }
 
     private fun stateForIdle(): UiState =
         if (session.isActive) UiState.Review(session.current, session.canUndo)
