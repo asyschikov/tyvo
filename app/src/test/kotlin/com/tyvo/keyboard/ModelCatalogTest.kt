@@ -1,8 +1,7 @@
 package com.tyvo.keyboard
 
 import com.tyvo.keyboard.data.ModelCatalog
-import com.tyvo.keyboard.data.PolishProvider
-import com.tyvo.keyboard.data.TranscribeProvider
+import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
 import org.junit.Assert.assertFalse
@@ -14,14 +13,14 @@ class ModelCatalogTest {
     @Test
     fun `every provider default appears in its own dropdown`() {
         // Otherwise the picker opens showing a value it cannot represent.
-        TranscribeProvider.entries.forEach { p ->
+        Provider.entries.forEach { p ->
             val ids = ModelCatalog.transcribeFor(p).map { it.id }
             assertTrue(
                 "default ${Transcriber.defaultModelFor(p)} missing from $p list",
                 Transcriber.defaultModelFor(p) in ids,
             )
         }
-        PolishProvider.entries.filter { it != PolishProvider.NONE }.forEach { p ->
+        Provider.entries.forEach { p ->
             val ids = ModelCatalog.polishFor(p).map { it.id }
             assertTrue(
                 "default ${Polisher.defaultModelFor(p)} missing from $p list",
@@ -66,7 +65,10 @@ class ModelCatalogTest {
     }
 
     @Test
-    fun `polish NONE offers no models`() {
-        assertTrue(ModelCatalog.polishFor(PolishProvider.NONE).isEmpty())
+    fun `every provider offers at least one model per stage`() {
+        Provider.entries.forEach {
+            assertTrue("no transcribe models for $it", ModelCatalog.transcribeFor(it).isNotEmpty())
+            assertTrue("no polish models for $it", ModelCatalog.polishFor(it).isNotEmpty())
+        }
     }
 }

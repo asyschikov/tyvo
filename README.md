@@ -33,13 +33,16 @@ the keyboard feel broken.
 
 ## Providers
 
-| Provider  | Transcription | Polish |
-|-----------|---------------|--------|
-| OpenAI    | ✅ `gpt-4o-mini-transcribe` | ✅ `gpt-4o-mini` |
-| Mistral   | ✅ `voxtral-mini-latest`    | ✅ `mistral-small-latest` |
+You pick **one** provider; it handles both stages, so you only ever hold a
+single API key.
 
-Either provider can serve either stage independently, and any model can be
-overridden by name in settings.
+| Provider  | Transcription | Clean-up |
+|-----------|---------------|----------|
+| OpenAI    | `gpt-4o-mini-transcribe` | `gpt-4o-mini` |
+| Mistral   | `voxtral-mini-latest`    | `ministral-3b-latest` |
+
+Keys and model choices are stored **per provider**, so switching to the other
+one and back does not cost you a key you already pasted in.
 
 Note on model names: of the Voxtral family, only `voxtral-mini-*` reports
 `audio_transcription` capability. `voxtral-small-latest` does **not**

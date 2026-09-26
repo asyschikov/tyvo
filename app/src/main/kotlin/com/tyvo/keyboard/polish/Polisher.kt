@@ -1,6 +1,6 @@
 package com.tyvo.keyboard.polish
 
-import com.tyvo.keyboard.data.PolishProvider
+import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.net.Http
 import com.tyvo.keyboard.net.TyvoException
@@ -29,20 +29,20 @@ class Polisher(private val settings: Settings) {
     suspend fun transform(
         text: String,
         instruction: String,
-        provider: PolishProvider? = null,
+        provider: Provider? = null,
     ): String = run(Prompts.transform(instruction), text, provider)
 
     private suspend fun run(
         system: String,
         user: String,
-        override: PolishProvider? = null,
+        override: Provider? = null,
     ): String =
         withContext(Dispatchers.IO) {
             if (user.isBlank()) return@withContext user
-            when (override ?: settings.polishProvider) {
-                PolishProvider.OPENAI -> openAi(system, user, modelFor(PolishProvider.OPENAI, override))
-                PolishProvider.MISTRAL -> mistral(system, user, modelFor(PolishProvider.MISTRAL, override))
-                PolishProvider.NONE -> user
+            val p = override ?: settings.provider
+            when (p) {
+                Provider.OPENAI -> openAi(system, user, modelFor(p, override))
+                Provider.MISTRAL -> mistral(system, user, modelFor(p, override))
             }
         }
 
@@ -51,11 +51,11 @@ class Polisher(private val settings: Settings) {
      * they actually selected -- a probe of a different provider must not
      * inherit it.
      */
-    private fun modelFor(p: PolishProvider, override: PolishProvider?): String =
-        if (override == null || override == settings.polishProvider) {
-            settings.polishModel.ifBlank { defaultModelFor(p) }
+    private fun modelFor(p: Provider, override: Provider?): String =
+        if (override == null || override == settings.provider) {
+            settings.currentPolishModel.ifBlank { defaultModelFor(p) }
         } else {
-            defaultModelFor(p)
+            settings.polishModel(p).ifBlank { defaultModelFor(p) }
         }
 
     /** Output cap scaled to input: rewrites are never much longer than source. */
@@ -65,7 +65,7 @@ class Polisher(private val settings: Settings) {
     // ---- OpenAI ---------------------------------------------------------
 
     private fun openAi(system: String, user: String, model: String): String {
-        val key = settings.openAiKey
+        val key = settings.key(Provider.OPENAI)
         if (key.isBlank()) throw TyvoException("Add an OpenAI API key in Tyvo settings.")
 
         val payload = JSONObject().apply {
@@ -97,7 +97,7 @@ class Polisher(private val settings: Settings) {
     // ---- Mistral --------------------------------------------------------
 
     private fun mistral(system: String, user: String, model: String): String {
-        val key = settings.mistralKey
+        val key = settings.key(Provider.MISTRAL)
         if (key.isBlank()) throw TyvoException("Add a Mistral API key in Tyvo settings.")
 
         val payload = JSONObject().apply {
@@ -132,10 +132,9 @@ class Polisher(private val settings: Settings) {
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
         const val DEFAULT_MISTRAL_MODEL = "ministral-3b-latest"
 
-        fun defaultModelFor(p: PolishProvider): String = when (p) {
-            PolishProvider.OPENAI -> DEFAULT_OPENAI_MODEL
-            PolishProvider.MISTRAL -> DEFAULT_MISTRAL_MODEL
-            PolishProvider.NONE -> ""
+        fun defaultModelFor(p: Provider): String = when (p) {
+            Provider.OPENAI -> DEFAULT_OPENAI_MODEL
+            Provider.MISTRAL -> DEFAULT_MISTRAL_MODEL
         }
     }
 }

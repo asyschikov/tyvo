@@ -1,6 +1,6 @@
 package com.tyvo.keyboard.net
 
-import com.tyvo.keyboard.data.PolishProvider
+import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.polish.Polisher
 import kotlinx.coroutines.Dispatchers
@@ -21,12 +21,9 @@ object ConnectionTest {
      * Round-trips a short string through the polish path. Works for all three
      * providers, since every one of them serves text in, text out.
      */
-    suspend fun test(settings: Settings, provider: PolishProvider): Result =
+    suspend fun test(settings: Settings, provider: Provider): Result =
         withContext(Dispatchers.IO) {
-            if (provider == PolishProvider.NONE) {
-                return@withContext Result.Ok("Polish is off.")
-            }
-            if (settings.keyFor(provider).isBlank()) {
+            if (settings.key(provider).isBlank()) {
                 return@withContext Result.Failed("No ${provider.label} key set.")
             }
             try {

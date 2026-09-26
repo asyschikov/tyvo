@@ -110,14 +110,13 @@ object ModelCatalog {
         ),
     )
 
-    fun transcribeFor(p: TranscribeProvider): List<ModelOption> = when (p) {
-        TranscribeProvider.OPENAI -> OPENAI_TRANSCRIBE
-        TranscribeProvider.MISTRAL -> MISTRAL_TRANSCRIBE
+    fun transcribeFor(p: Provider): List<ModelOption> = when (p) {
+        Provider.OPENAI -> OPENAI_TRANSCRIBE
+        Provider.MISTRAL -> MISTRAL_TRANSCRIBE
     }
 
-    fun polishFor(p: PolishProvider): List<ModelOption> = when (p) {
-        PolishProvider.OPENAI -> OPENAI_POLISH
-        PolishProvider.MISTRAL -> MISTRAL_POLISH
-        PolishProvider.NONE -> emptyList()
+    fun polishFor(p: Provider): List<ModelOption> = when (p) {
+        Provider.OPENAI -> OPENAI_POLISH
+        Provider.MISTRAL -> MISTRAL_POLISH
     }
 }

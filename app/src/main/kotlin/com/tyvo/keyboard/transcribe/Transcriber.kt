@@ -1,7 +1,7 @@
 package com.tyvo.keyboard.transcribe
 
 import com.tyvo.keyboard.data.Settings
-import com.tyvo.keyboard.data.TranscribeProvider
+import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.Http
 import com.tyvo.keyboard.net.TyvoException
 import kotlinx.coroutines.Dispatchers
@@ -19,19 +19,19 @@ import java.io.File
 class Transcriber(private val settings: Settings) {
 
     suspend fun transcribe(audio: File): String = withContext(Dispatchers.IO) {
-        when (settings.transcribeProvider) {
-            TranscribeProvider.OPENAI -> openAi(audio)
-            TranscribeProvider.MISTRAL -> mistral(audio)
+        when (settings.provider) {
+            Provider.OPENAI -> openAi(audio)
+            Provider.MISTRAL -> mistral(audio)
         }
     }
 
     // ---- OpenAI ---------------------------------------------------------
 
     private fun openAi(audio: File): String {
-        val key = settings.openAiKey
+        val key = settings.key(Provider.OPENAI)
         if (key.isBlank()) throw TyvoException("Add an OpenAI API key in Tyvo settings.")
 
-        val model = settings.transcribeModel.ifBlank { DEFAULT_OPENAI_MODEL }
+        val model = settings.currentTranscribeModel.ifBlank { DEFAULT_OPENAI_MODEL }
 
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart(
@@ -66,10 +66,10 @@ class Transcriber(private val settings: Settings) {
     // ---- Mistral --------------------------------------------------------
 
     private fun mistral(audio: File): String {
-        val key = settings.mistralKey
+        val key = settings.key(Provider.MISTRAL)
         if (key.isBlank()) throw TyvoException("Add a Mistral API key in Tyvo settings.")
 
-        val model = settings.transcribeModel.ifBlank { DEFAULT_MISTRAL_MODEL }
+        val model = settings.currentTranscribeModel.ifBlank { DEFAULT_MISTRAL_MODEL }
 
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart(
@@ -101,9 +101,9 @@ class Transcriber(private val settings: Settings) {
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini-transcribe"
         const val DEFAULT_MISTRAL_MODEL = "voxtral-mini-latest"
 
-        fun defaultModelFor(p: TranscribeProvider): String = when (p) {
-            TranscribeProvider.OPENAI -> DEFAULT_OPENAI_MODEL
-            TranscribeProvider.MISTRAL -> DEFAULT_MISTRAL_MODEL
+        fun defaultModelFor(p: Provider): String = when (p) {
+            Provider.OPENAI -> DEFAULT_OPENAI_MODEL
+            Provider.MISTRAL -> DEFAULT_MISTRAL_MODEL
         }
     }
 }

@@ -6,18 +6,15 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 /**
- * Provider used to turn recorded audio into text.
+ * The AI provider backing the whole keyboard.
+ *
+ * One provider handles both transcription and polish. Mixing providers across
+ * the two stages would mean holding two API keys to do one job, which is not
+ * a trade worth offering by default.
  */
-enum class TranscribeProvider(val label: String) {
+enum class Provider(val label: String) {
     OPENAI("OpenAI"),
     MISTRAL("Mistral");
-}
-
-/** Provider used for the LLM text-polish / correction pass. */
-enum class PolishProvider(val label: String) {
-    OPENAI("OpenAI"),
-    MISTRAL("Mistral"),
-    NONE("Off (raw transcript)");
 }
 
 /**
@@ -45,54 +42,57 @@ class Settings(context: Context) {
     private val plain: SharedPreferences =
         appContext.getSharedPreferences("tyvo_prefs", Context.MODE_PRIVATE)
 
-    // ---- API keys -------------------------------------------------------
+    // ---- Provider --------------------------------------------------------
 
-    var openAiKey: String
-        get() = secure.getString(KEY_OPENAI, "").orEmpty()
-        set(v) = secure.edit().putString(KEY_OPENAI, v.trim()).apply()
+    var provider: Provider
+        get() = runCatching {
+            Provider.valueOf(plain.getString(KEY_PROVIDER, null) ?: Provider.MISTRAL.name)
+        }.getOrDefault(Provider.MISTRAL)
+        set(v) = plain.edit().putString(KEY_PROVIDER, v.name).apply()
 
-    var mistralKey: String
-        get() = secure.getString(KEY_MISTRAL, "").orEmpty()
-        set(v) = secure.edit().putString(KEY_MISTRAL, v.trim()).apply()
+    // ---- API keys --------------------------------------------------------
+    //
+    // Each provider keeps its own slot, so switching away and back never
+    // costs you a key you already pasted in.
 
-    fun keyFor(p: TranscribeProvider): String = when (p) {
-        TranscribeProvider.OPENAI -> openAiKey
-        TranscribeProvider.MISTRAL -> mistralKey
+    fun key(p: Provider): String = secure.getString(keyName(p), "").orEmpty()
+
+    fun setKey(p: Provider, value: String) {
+        secure.edit().putString(keyName(p), value.trim()).apply()
     }
 
-    fun keyFor(p: PolishProvider): String = when (p) {
-        PolishProvider.OPENAI -> openAiKey
-        PolishProvider.MISTRAL -> mistralKey
-        PolishProvider.NONE -> ""
+    /** Key for the currently selected provider. */
+    val currentKey: String get() = key(provider)
+
+    private fun keyName(p: Provider) = when (p) {
+        Provider.OPENAI -> KEY_OPENAI
+        Provider.MISTRAL -> KEY_MISTRAL
     }
 
-    // ---- Provider selection ---------------------------------------------
+    // ---- Models ----------------------------------------------------------
+    //
+    // Also stored per provider: a model id is only meaningful to the provider
+    // it belongs to, and carrying one across a switch would send a Mistral
+    // model name to OpenAI. Blank means "use the default".
 
-    var transcribeProvider: TranscribeProvider
-        get() = runCatching {
-            TranscribeProvider.valueOf(
-                plain.getString(KEY_TP, null) ?: TranscribeProvider.OPENAI.name
-            )
-        }.getOrDefault(TranscribeProvider.OPENAI)
-        set(v) = plain.edit().putString(KEY_TP, v.name).apply()
+    fun transcribeModel(p: Provider): String =
+        plain.getString(modelName(p, "transcribe"), "").orEmpty()
 
-    var polishProvider: PolishProvider
-        get() = runCatching {
-            PolishProvider.valueOf(
-                plain.getString(KEY_PP, null) ?: PolishProvider.OPENAI.name
-            )
-        }.getOrDefault(PolishProvider.OPENAI)
-        set(v) = plain.edit().putString(KEY_PP, v.name).apply()
+    fun setTranscribeModel(p: Provider, value: String) {
+        plain.edit().putString(modelName(p, "transcribe"), value.trim()).apply()
+    }
 
-    // ---- Model overrides (blank = provider default) ----------------------
+    fun polishModel(p: Provider): String =
+        plain.getString(modelName(p, "polish"), "").orEmpty()
 
-    var transcribeModel: String
-        get() = plain.getString(KEY_TMODEL, "").orEmpty()
-        set(v) = plain.edit().putString(KEY_TMODEL, v.trim()).apply()
+    fun setPolishModel(p: Provider, value: String) {
+        plain.edit().putString(modelName(p, "polish"), value.trim()).apply()
+    }
 
-    var polishModel: String
-        get() = plain.getString(KEY_PMODEL, "").orEmpty()
-        set(v) = plain.edit().putString(KEY_PMODEL, v.trim()).apply()
+    val currentTranscribeModel: String get() = transcribeModel(provider)
+    val currentPolishModel: String get() = polishModel(provider)
+
+    private fun modelName(p: Provider, stage: String) = "model_${stage}_${p.name}"
 
     // ---- Behaviour -------------------------------------------------------
 
@@ -100,6 +100,14 @@ class Settings(context: Context) {
     var autoPolish: Boolean
         get() = plain.getBoolean(KEY_AUTOPOLISH, true)
         set(v) = plain.edit().putBoolean(KEY_AUTOPOLISH, v).apply()
+
+    /**
+     * Whether the polish stage runs at all. Off means the raw transcript is
+     * inserted and the quick actions are unavailable.
+     */
+    var polishEnabled: Boolean
+        get() = plain.getBoolean(KEY_POLISH_ON, true)
+        set(v) = plain.edit().putBoolean(KEY_POLISH_ON, v).apply()
 
     /** Spoken language hint (ISO-639-1), blank = auto-detect. */
     var languageHint: String
@@ -120,13 +128,11 @@ class Settings(context: Context) {
             .filter { it.isNotEmpty() }
 
     private companion object {
+        const val KEY_PROVIDER = "provider"
         const val KEY_OPENAI = "openai_key"
         const val KEY_MISTRAL = "mistral_key"
-        const val KEY_TP = "transcribe_provider"
-        const val KEY_PP = "polish_provider"
-        const val KEY_TMODEL = "transcribe_model"
-        const val KEY_PMODEL = "polish_model"
         const val KEY_AUTOPOLISH = "auto_polish"
+        const val KEY_POLISH_ON = "polish_enabled"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
     }

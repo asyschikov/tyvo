@@ -26,12 +26,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.tyvo.keyboard.data.PolishProvider
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
-import com.tyvo.keyboard.data.TranscribeProvider
+import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
 import kotlinx.coroutines.launch
 import com.tyvo.keyboard.polish.Polisher
@@ -59,24 +58,23 @@ class SettingsActivity : ComponentActivity() {
 private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
     val ctx = activity as Context
 
-    var openai by remember { mutableStateOf(settings.openAiKey) }
-    var mistral by remember { mutableStateOf(settings.mistralKey) }
-    var tProvider by remember { mutableStateOf(settings.transcribeProvider) }
-    var pProvider by remember { mutableStateOf(settings.polishProvider) }
-    var tModel by remember { mutableStateOf(settings.transcribeModel) }
-    var pModel by remember { mutableStateOf(settings.polishModel) }
+    var provider by remember { mutableStateOf(settings.provider) }
+    // Keyed on provider so switching swaps in that provider's own saved
+    // values rather than carrying the previous one's across.
+    var apiKey by remember(provider) { mutableStateOf(settings.key(provider)) }
+    var tModel by remember(provider) { mutableStateOf(settings.transcribeModel(provider)) }
+    var pModel by remember(provider) { mutableStateOf(settings.polishModel(provider)) }
+
+    var polishOn by remember { mutableStateOf(settings.polishEnabled) }
     var autoPolish by remember { mutableStateOf(settings.autoPolish) }
     var lang by remember { mutableStateOf(settings.languageHint) }
     var vocab by remember { mutableStateOf(settings.vocabulary) }
-    var showKeys by remember { mutableStateOf(false) }
+    var showKey by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Recomputed on every relevant edit so the warning tracks the live config.
-    val readiness = remember(openai, mistral, tProvider, pProvider) {
-        Readiness.of(settings)
-    }
+    val readiness = remember(apiKey, provider) { Readiness.of(settings) }
 
     var micGranted by remember {
         mutableStateOf(
@@ -147,78 +145,58 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
             )
         }
 
-        // ---- keys -------------------------------------------------------
-        SectionCard("API keys") {
+        // ---- provider ----------------------------------------------------
+        SectionCard("AI provider") {
             Text(
-                "Stored encrypted on this device and sent only to the provider you pick.",
+                "One provider handles both transcription and clean-up, so you " +
+                    "only ever need a single API key.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(4.dp))
-            KeyField("OpenAI", openai, showKeys) {
-                openai = it; settings.openAiKey = it
-            }
-            KeyField("Mistral", mistral, showKeys) {
-                mistral = it; settings.mistralKey = it
-            }
+            ChoiceRow(
+                options = Provider.entries.map { it to it.label },
+                selected = provider,
+                onSelect = {
+                    provider = it
+                    settings.provider = it
+                    testResult = null
+                },
+            )
+
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it; settings.setKey(provider, it) },
+                label = { Text("${provider.label} API key") },
+                singleLine = true,
+                visualTransformation =
+                    if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                textStyle = MaterialTheme.typography.bodyMedium
+                    .copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth(),
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = showKeys, onCheckedChange = { showKeys = it })
-                Text("Show keys", style = MaterialTheme.typography.bodyMedium)
+                Checkbox(checked = showKey, onCheckedChange = { showKey = it })
+                Text("Show key", style = MaterialTheme.typography.bodyMedium)
             }
-        }
-
-        // ---- transcription ----------------------------------------------
-        SectionCard("Transcription") {
             Text(
-                "Turns your voice into text.",
+                "Stored encrypted on this device and sent only to " +
+                    "${provider.label}. Keys for other providers are kept, so " +
+                    "switching back does not mean pasting it again.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            ChoiceRow(
-                options = TranscribeProvider.entries.map { it to it.label },
-                selected = tProvider,
-                onSelect = { tProvider = it; settings.transcribeProvider = it },
-            )
-            ModelPicker(
-                options = ModelCatalog.transcribeFor(tProvider),
-                selected = tModel,
-                default = Transcriber.defaultModelFor(tProvider),
-                onSelect = { tModel = it; settings.transcribeModel = it },
-            )
-        }
 
-        // ---- polish -------------------------------------------------------
-        SectionCard("Polish") {
-            Text(
-                "Applies spoken corrections (\"book pasta, sorry no, lasagna\"), " +
-                    "removes filler, and punctuates.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ChoiceRow(
-                options = PolishProvider.entries.map { it to it.label },
-                selected = pProvider,
-                onSelect = { pProvider = it; settings.polishProvider = it },
-            )
-            if (pProvider != PolishProvider.NONE) {
-                ModelPicker(
-                    options = ModelCatalog.polishFor(pProvider),
-                    selected = pModel,
-                    default = Polisher.defaultModelFor(pProvider),
-                    onSelect = { pModel = it; settings.polishModel = it },
-                )
-            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Button(
-                    enabled = !testing && pProvider != PolishProvider.NONE,
+                    enabled = !testing && apiKey.isNotBlank(),
                     onClick = {
                         testing = true
                         testResult = null
                         scope.launch {
-                            val r = ConnectionTest.test(settings, pProvider)
+                            val r = ConnectionTest.test(settings, provider)
                             testResult = when (r) {
                                 is ConnectionTest.Result.Ok -> r.detail
                                 is ConnectionTest.Result.Failed -> r.reason
@@ -232,22 +210,67 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                     Text(it, style = MaterialTheme.typography.bodySmall)
                 }
             }
+        }
+
+        // ---- models -------------------------------------------------------
+        SectionCard("Models") {
+            Text(
+                "Transcription — turns your voice into text.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ModelPicker(
+                options = ModelCatalog.transcribeFor(provider),
+                selected = tModel,
+                default = Transcriber.defaultModelFor(provider),
+                onSelect = { tModel = it; settings.setTranscribeModel(provider, it) },
+            )
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Clean-up — applies spoken corrections (\"book pasta, sorry no, " +
+                    "lasagna\"), removes filler, and punctuates.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Switch(
-                    checked = autoPolish,
-                    onCheckedChange = { autoPolish = it; settings.autoPolish = it },
+                    checked = polishOn,
+                    onCheckedChange = { polishOn = it; settings.polishEnabled = it },
                 )
                 Spacer(Modifier.width(10.dp))
-                Column {
-                    Text("Polish automatically", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Off: raw transcript is inserted; polish stays one tap away.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text("Clean up dictation", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (polishOn) {
+                ModelPicker(
+                    options = ModelCatalog.polishFor(provider),
+                    selected = pModel,
+                    default = Polisher.defaultModelFor(provider),
+                    onSelect = { pModel = it; settings.setPolishModel(provider, it) },
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Switch(
+                        checked = autoPolish,
+                        onCheckedChange = { autoPolish = it; settings.autoPolish = it },
                     )
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            "Clean up automatically",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            "Off: raw transcript is inserted; clean-up stays one tap away.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

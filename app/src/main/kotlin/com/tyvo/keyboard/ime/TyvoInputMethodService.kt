@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -183,8 +184,7 @@ class TyvoInputMethodService : InputMethodService() {
                     return@launch
                 }
 
-                val shouldPolish = settings.autoPolish &&
-                    settings.polishProvider != com.tyvo.keyboard.data.PolishProvider.NONE
+                val shouldPolish = settings.autoPolish && settings.polishEnabled
 
                 if (!shouldPolish) {
                     commitFresh(raw)
@@ -337,12 +337,39 @@ class TyvoInputMethodService : InputMethodService() {
         return prev.isLetterOrDigit() || prev in ".,!?;:\")"
     }
 
+    /**
+     * Backspace.
+     *
+     * When text is selected the selection is what should go, but
+     * deleteSurroundingText only ever removes characters adjacent to the
+     * cursor and silently does nothing while a selection exists. So we check
+     * for one first and replace it with an empty string.
+     *
+     * Falls back to a real key event when we cannot read the selection, which
+     * is the case in a few webview-backed fields.
+     */
     private fun backspace() {
         val ic = currentInputConnection ?: return
-        // Typing invalidates the session: our committed text no longer matches.
+        // Editing invalidates the session: our committed text no longer matches.
         session.clear()
         committed = ""
-        ic.deleteSurroundingText(1, 0)
+
+        val selected = ic.getSelectedText(0)
+        if (selected != null && selected.isNotEmpty()) {
+            ic.commitText("", 1)
+        } else {
+            val before = ic.getTextBeforeCursor(2, 0)
+            if (before == null) {
+                // Selection state unknown; let the editor apply its own rules.
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            } else {
+                // Delete a whole surrogate pair so emoji vanish in one tap.
+                val n = if (before.length >= 2 &&
+                    Character.isSurrogatePair(before[0], before[1])
+                ) 2 else 1
+                ic.deleteSurroundingText(n, 0)
+            }
+        }
         render(UiState.Idle())
     }
 
@@ -380,8 +407,7 @@ class TyvoInputMethodService : InputMethodService() {
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
-    private fun hasTranscribeKey(): Boolean =
-        settings.keyFor(settings.transcribeProvider).isNotBlank()
+    private fun hasTranscribeKey(): Boolean = settings.currentKey.isNotBlank()
 
     private fun openSettings() {
         startActivity(
