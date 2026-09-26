@@ -43,6 +43,22 @@ class TyvoInputMethodService : InputMethodService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    private companion object {
+        /** Marks a variant produced by a typed instruction rather than a chip. */
+        const val CUSTOM_ACTION_ID = "__custom__"
+
+        /**
+         * Substrings that mark a typed instruction as a translation request,
+         * in the languages most likely to be dictated here.
+         */
+        val TRANSLATION_HINTS = listOf(
+            "translat", "in english", "to english", "in german", "to german",
+            "in french", "to french", "in spanish", "to spanish",
+            "in russian", "to russian", "перевед", "перевод", "по-английски",
+            "на английский", "на русский", "übersetz", "traduis", "traduce",
+        )
+    }
+
     private lateinit var settings: Settings
     private lateinit var recorder: AudioRecorder
     private lateinit var transcriber: Transcriber
@@ -74,7 +90,8 @@ class TyvoInputMethodService : InputMethodService() {
         v.onAction = { runAction(it) }
         v.onUndo = { undo() }
         v.onAccept = { acceptSession() }
-        v.onRetryPolish = { retryPolish() }
+        v.onRepolish = { repolish() }
+        v.onUnpolish = { unpolish() }
         v.onOpenSettings = { openSettings() }
         v.onSwitchKeyboard = { switchAway() }
         v.onBackspace = { backspace() }
@@ -155,11 +172,8 @@ class TyvoInputMethodService : InputMethodService() {
         if (file == null) {
             // A stray tap should not throw away text still under review.
             render(
-                if (session.isActive) {
-                    UiState.Review(session.current, session.canUndo, note = "Too short.")
-                } else {
-                    UiState.Idle("Too short - speak while the mic is active.")
-                }
+                if (session.isActive) reviewOrIdle(note = "Too short.")
+                else UiState.Idle("Too short - speak while the mic is active.")
             )
             return
         }
@@ -188,7 +202,7 @@ class TyvoInputMethodService : InputMethodService() {
 
                 if (!shouldPolish) {
                     commitFresh(raw)
-                    render(UiState.Review(raw, session.canUndo))
+                    render(reviewOrIdle())
                     return@launch
                 }
 
@@ -200,11 +214,11 @@ class TyvoInputMethodService : InputMethodService() {
                 val polished = try {
                     polisher.cleanUp(raw)
                 } catch (e: TyvoException) {
-                    render(UiState.Review(raw, session.canUndo, note = e.message))
+                    render(reviewOrIdle(note = e.message))
                     return@launch
                 }
                 if (polished != raw && replaceCommitted(polished)) {
-                    session.advance(polished)
+                    session.setPolished(polished)
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
@@ -217,51 +231,106 @@ class TyvoInputMethodService : InputMethodService() {
         }
     }
 
-    private fun runAction(action: QuickAction) = runInstruction(action.instruction, action.label)
+    private fun runAction(action: QuickAction) =
+        runInstruction(action.instruction, action.label, action.id, action.translating)
 
-    private fun runCustom(instruction: String) = runInstruction(instruction, "Rewriting")
+    private fun runCustom(instruction: String) =
+        // A typed instruction may legitimately ask for a translation, so the
+        // language lock is relaxed only when the user actually said so.
+        runInstruction(
+            instruction,
+            "Rewriting",
+            CUSTOM_ACTION_ID,
+            translating = looksLikeTranslation(instruction),
+        )
 
-    private fun runInstruction(instruction: String, label: String) {
-        val text = session.current
-        if (text.isBlank()) return
+    /** Whether a typed instruction is asking for a language change. */
+    private fun looksLikeTranslation(instruction: String): Boolean {
+        val s = instruction.lowercase()
+        return TRANSLATION_HINTS.any { it in s }
+    }
+
+    /**
+     * Applies an instruction to the session's base text.
+     *
+     * Deliberately not to whatever is currently in the field: chaining
+     * rewrites compounds the model's drift, so tapping Formal then Shorter
+     * gives a short version of the original, not a short version of the
+     * formal rewrite.
+     */
+    private fun runInstruction(
+        instruction: String,
+        label: String,
+        actionId: String,
+        translating: Boolean,
+    ) {
+        val source = session.base
+        if (source.isBlank()) return
         pipeline?.cancel()
         pipeline = scope.launch {
-            render(UiState.Review(text, session.canUndo, busy = true, note = label))
+            render(reviewOrIdle(note = label, busy = true))
             try {
-                val result = polisher.transform(text, instruction)
-                if (result != text && replaceCommitted(result)) {
-                    session.advance(result)
+                val result = polisher.transform(
+                    text = source,
+                    instruction = instruction,
+                    translating = translating,
+                )
+                if (replaceCommitted(result)) {
+                    session.setVariant(result, actionId)
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(UiState.Review(text, session.canUndo, note = e.message))
+                render(reviewOrIdle(note = e.message))
             } catch (e: Exception) {
-                render(UiState.Review(text, session.canUndo, note = "Rewrite failed."))
+                render(reviewOrIdle(note = "Rewrite failed."))
             }
         }
     }
 
-    private fun retryPolish() {
-        val text = session.current
-        if (text.isBlank()) return
+    /**
+     * Produces a fresh polished version and makes it the new base.
+     *
+     * Always cleans up the raw transcript rather than the current text, so
+     * re-polishing after an unpolish gives a genuine second attempt instead
+     * of polishing an already-polished sentence.
+     */
+    private fun repolish() {
+        val source = session.rawTranscript.ifBlank { session.base }
+        if (source.isBlank()) return
         pipeline?.cancel()
         pipeline = scope.launch {
-            render(UiState.Review(text, session.canUndo, busy = true, note = "Polishing"))
+            render(reviewOrIdle(note = "Polishing", busy = true))
             try {
-                val polished = polisher.cleanUp(text)
-                if (polished != text && replaceCommitted(polished)) {
-                    session.advance(polished)
+                val polished = polisher.cleanUp(source)
+                if (replaceCommitted(polished)) {
+                    session.setPolished(polished)
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(UiState.Review(text, session.canUndo, note = e.message))
+                render(reviewOrIdle(note = e.message))
+            } catch (e: Exception) {
+                render(reviewOrIdle(note = "Clean-up failed."))
             }
         }
     }
 
+    /**
+     * Drops the polished version and returns to what was actually said.
+     *
+     * Lossy on purpose: the polished text is discarded, and re-polishing
+     * afterwards produces a new version rather than restoring this one.
+     */
+    private fun unpolish() {
+        val rawText = session.unpolish() ?: return
+        replaceCommitted(rawText)
+        haptic()
+        render(reviewOrIdle())
+    }
+
+    /** Drops the applied quick action, returning to the base text. */
     private fun undo() {
-        val prev = session.undo() ?: return
-        replaceCommitted(prev)
+        val restored = session.undo() ?: return
+        replaceCommitted(restored)
         haptic()
         render(reviewOrIdle())
     }
@@ -388,16 +457,23 @@ class TyvoInputMethodService : InputMethodService() {
      * every edit so a session invalidated mid-flight collapses gracefully
      * instead of offering actions that would do nothing.
      */
-    private fun reviewOrIdle(note: String? = null): UiState =
+    private fun reviewOrIdle(note: String? = null, busy: Boolean = false): UiState =
         if (session.isActive) {
-            UiState.Review(session.current, session.canUndo, note = note)
+            UiState.Review(
+                text = session.current,
+                canUndo = session.canUndo,
+                canUnpolish = session.canUnpolish,
+                isPolished = session.isPolished,
+                activeAction = session.activeAction,
+                busy = busy,
+                note = note,
+            )
         } else {
             UiState.Idle(note ?: "Text is no longer editable here.")
         }
 
     private fun stateForIdle(): UiState =
-        if (session.isActive) UiState.Review(session.current, session.canUndo)
-        else UiState.Idle()
+        if (session.isActive) reviewOrIdle() else UiState.Idle()
 
     private fun render(state: UiState) {
         view?.render(state)

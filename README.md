@@ -61,7 +61,35 @@ Offered on the review strip after dictation, each one re-editable and undoable:
 Plus a free-text box: type any instruction ("make it sound less annoyed",
 "turn this into a Jira ticket") and it applies to the current text.
 
-Every transformation is undoable one step at a time, up to 20 steps.
+### How actions compose
+
+Every action transforms the **base** text, never the previous action's output.
+Tapping Formal then Shorter gives a short version of the base, not a short
+version of the formal rewrite — chaining rewrites compounds the model's drift,
+and after three taps you are editing something several steps removed from what
+you said. Actions are alternatives to each other; the applied one is
+highlighted, and Undo returns to the base.
+
+The base starts as the cleaned-up dictation, because that is what you see and
+think of as "your text". **Undo clean-up** swaps it for the raw transcript.
+That is lossy on purpose: the cleaned-up version is discarded, and
+**Re-clean** produces a fresh one rather than restoring it.
+
+```
+raw transcript ──clean up──▶ base ──action──▶ variant (in the field)
+      ▲                       │                  │
+      └── Undo clean-up ──────┘        Undo ──────┘
+```
+
+### Language
+
+Actions never change the language. The instructions are written in English,
+which is enough on its own to pull Russian or German text into English, so the
+language rule is stated first, repeated at the end, and kept deliberately
+*relative* — it never names a language, because naming one made a small model
+translate English input into it. Only "→ English" is allowed to change
+language, and a typed instruction relaxes the lock only when it actually asks
+for a translation.
 
 ## Setup
 

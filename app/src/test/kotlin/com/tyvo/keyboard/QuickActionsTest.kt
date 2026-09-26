@@ -3,6 +3,7 @@ package com.tyvo.keyboard
 import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.polish.Prompts
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,6 +34,51 @@ class QuickActionsTest {
         QuickActions.ALL.forEach {
             assertTrue("instruction too vague: ${it.id}", it.instruction.length > 30)
         }
+    }
+
+    @Test
+    fun `only translation may change the language`() {
+        QuickActions.ALL.filter { it.translating }.let {
+            assertEquals("translation should be the sole exception", 1, it.size)
+            assertEquals("translate_en", it.first().id)
+        }
+    }
+
+    @Test
+    fun `the language rule never names a specific language`() {
+        // Naming one ("if the input is Russian...") made a small model
+        // translate English input INTO that language.
+        val p = Prompts.transform("Make it formal")
+        listOf("Russian", "German", "French", "Spanish").forEach {
+            assertFalse(
+                "the language rule must stay relative, but mentions $it",
+                p.contains("is $it, the output"),
+            )
+        }
+        assertTrue(p.contains("LANGUAGE (absolute)"))
+        assertTrue(p.contains("same language"))
+    }
+
+    @Test
+    fun `translating prompts relax the language lock`() {
+        // Compared on collapsed whitespace: the prompt is wrapped, so the
+        // prohibition spans a line break in the source.
+        fun flat(s: String) = s.replace(Regex("\\s+"), " ")
+        val locked = flat(Prompts.transform("Make it formal", translating = false))
+        val free = flat(Prompts.transform("Translate into English", translating = true))
+
+        assertTrue(
+            "a normal rewrite must be forbidden from translating",
+            locked.contains("Never translate or transliterate"),
+        )
+        assertFalse(
+            "a translation must not be told never to translate",
+            free.contains("Never translate or transliterate"),
+        )
+        assertTrue(
+            "a translation should be told the language change is expected",
+            free.contains("changing language is expected"),
+        )
     }
 
     @Test

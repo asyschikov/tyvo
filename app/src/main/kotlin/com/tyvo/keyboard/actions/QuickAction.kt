@@ -13,6 +13,13 @@ data class QuickAction(
     val label: String,
     val instruction: String,
     val group: Group,
+    /**
+     * Whether this action is allowed to change the output language. Only
+     * translation is; every other action must return the speaker's own
+     * language, which the prompt enforces hard because an English-language
+     * instruction otherwise drags non-English text into English.
+     */
+    val translating: Boolean = false,
 ) {
     enum class Group { TONE, LENGTH, FORM, FIX }
 }
@@ -86,8 +93,11 @@ object QuickActions {
     val EMAIL = QuickAction(
         id = "email",
         label = "Email",
-        instruction = "Format as a short email body with a greeting and sign-off " +
-            "placeholder. Do not invent names; use 'Hi,' and 'Thanks,' if unknown.",
+        instruction = "Format as a short email body with a greeting and a " +
+            "sign-off. Do not invent names. Write the greeting and sign-off in " +
+            "the same language as the text -- use that language's ordinary " +
+            "equivalents of 'Hi,' and 'Thanks,', never the English words " +
+            "unless the text itself is English.",
         group = QuickAction.Group.FORM,
     )
 
@@ -104,8 +114,12 @@ object QuickActions {
         label = "Commit",
         instruction = "Rewrite as a git commit message: imperative mood subject " +
             "line under 72 characters, then a blank line and body only if the " +
-            "text warrants one. Output the commit message alone: no notes, no " +
-            "explanation of your choices, no markdown fences.",
+            "text warrants one. Commit messages are conventionally English " +
+            "and lowercase-hyphenated, but neither convention applies here: " +
+            "write ordinary prose in the same language as the input. Output " +
+            "the commit message alone -- no notes, no " +
+            "explanation of your choices, no markdown fences, no horizontal " +
+            "rules, and never repeat it twice.",
         group = QuickAction.Group.FORM,
     )
 
@@ -142,8 +156,10 @@ object QuickActions {
     val TIGHTEN = QuickAction(
         id = "tighten",
         label = "Tighten",
-        instruction = "Remove filler, hedges and redundant words. Keep the meaning " +
-            "and roughly the structure.",
+        instruction = "Remove filler, hedges and redundant words. Keep every " +
+            "distinct piece of information and the sentence structure: this is " +
+            "a trim, not a summary, and the result should stay a complete " +
+            "sentence of at least half the original length.",
         group = QuickAction.Group.FIX,
     )
 
@@ -152,6 +168,7 @@ object QuickActions {
         label = "→ English",
         instruction = "Translate into natural English, preserving tone and register.",
         group = QuickAction.Group.FIX,
+        translating = true,
     )
 
     /** Order here is the order shown in the action bar. */

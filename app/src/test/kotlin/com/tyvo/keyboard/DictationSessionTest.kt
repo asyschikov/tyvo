@@ -9,58 +9,127 @@ import org.junit.Test
 
 class DictationSessionTest {
 
-    @Test
-    fun `begin sets text and clears history`() {
-        val s = DictationSession()
-        s.begin("first")
-        s.advance("second")
-        s.begin("fresh")
-        assertEquals("fresh", s.current)
-        assertFalse("a new dictation must not undo into the previous one", s.canUndo)
+    private fun dictated(raw: String, polished: String) = DictationSession().apply {
+        begin(raw)
+        setPolished(polished)
     }
 
     @Test
-    fun `advance records history and undo walks back one step`() {
-        val s = DictationSession()
-        s.begin("raw")
-        s.advance("polished")
-        s.advance("shortened")
-        assertEquals("shortened", s.current)
+    fun `actions transform the base, never each other`() {
+        // The whole point of the base: tapping Formal then Shorter must give
+        // a short version of the polished text, not a short version of the
+        // formal rewrite.
+        val s = dictated("raw text", "Polished text.")
+        s.setVariant("FORMAL VERSION", "formal")
+        assertEquals("Polished text.", s.base)
+        assertEquals("FORMAL VERSION", s.current)
 
-        assertEquals("polished", s.undo())
-        assertEquals("polished", s.current)
-        assertEquals("raw", s.undo())
-        assertEquals("raw", s.current)
+        s.setVariant("Short.", "shorter")
+        assertEquals("the base must survive a second action", "Polished text.", s.base)
+        assertEquals("Short.", s.current)
+        assertEquals("shorter", s.activeAction)
+    }
+
+    @Test
+    fun `undo returns to the base and clears the active action`() {
+        val s = dictated("raw text", "Polished text.")
+        s.setVariant("FORMAL", "formal")
+        assertTrue(s.canUndo)
+
+        assertEquals("Polished text.", s.undo())
+        assertEquals("Polished text.", s.current)
+        assertNull(s.activeAction)
         assertFalse(s.canUndo)
-        assertNull(s.undo())
+        assertNull("nothing left to undo", s.undo())
     }
 
     @Test
-    fun `advance ignores a no-op transformation`() {
-        val s = DictationSession()
-        s.begin("same")
-        s.advance("same")
-        assertFalse("an unchanged rewrite should not create an undo step", s.canUndo)
+    fun `a variant equal to the base is not a variant`() {
+        val s = dictated("raw text", "Polished text.")
+        s.setVariant("Polished text.", "formal")
+        assertFalse("an unchanged rewrite should not be undoable", s.canUndo)
+        assertNull(s.activeAction)
     }
 
     @Test
-    fun `history is bounded`() {
+    fun `unpolish swaps the base for the raw transcript`() {
+        val s = dictated("um raw text", "Polished text.")
+        assertTrue(s.canUnpolish)
+        assertTrue(s.isPolished)
+
+        assertEquals("um raw text", s.unpolish())
+        assertEquals("um raw text", s.base)
+        assertEquals("um raw text", s.current)
+        assertFalse(s.isPolished)
+        assertFalse("nothing left to unpolish", s.canUnpolish)
+    }
+
+    @Test
+    fun `unpolish is lossy - the polished version is gone`() {
+        val s = dictated("um raw text", "Polished text.")
+        s.unpolish()
+        // Only a fresh polish brings a polished version back, and it becomes
+        // the new base rather than restoring the discarded one.
+        s.setPolished("Newly polished.")
+        assertEquals("Newly polished.", s.base)
+        assertTrue(s.isPolished)
+        assertEquals("um raw text", s.rawTranscript)
+    }
+
+    @Test
+    fun `unpolish discards an applied action`() {
+        val s = dictated("um raw text", "Polished text.")
+        s.setVariant("FORMAL", "formal")
+        s.unpolish()
+        assertEquals("um raw text", s.current)
+        assertNull(s.activeAction)
+        assertFalse(s.canUndo)
+    }
+
+    @Test
+    fun `polishing does not change the raw transcript`() {
+        val s = dictated("um raw text", "First polish.")
+        s.setPolished("Second polish.")
+        assertEquals("um raw text", s.rawTranscript)
+        assertEquals("Second polish.", s.base)
+    }
+
+    @Test
+    fun `an unpolished session cannot be unpolished again`() {
         val s = DictationSession()
-        s.begin("0")
-        repeat(40) { s.advance("step$it") }
-        var steps = 0
-        while (s.undo() != null) steps++
-        assertTrue("history must stay bounded, was $steps", steps <= 20)
+        s.begin("just raw")
+        assertFalse("never polished, so nothing to revert", s.canUnpolish)
+        assertNull(s.unpolish())
+    }
+
+    @Test
+    fun `a no-op polish leaves nothing to unpolish`() {
+        val s = DictationSession()
+        s.begin("Already clean.")
+        s.setPolished("Already clean.")
+        assertFalse(s.canUnpolish)
+    }
+
+    @Test
+    fun `begin resets everything`() {
+        val s = dictated("old raw", "Old polished.")
+        s.setVariant("OLD FORMAL", "formal")
+        s.begin("new raw")
+        assertEquals("new raw", s.current)
+        assertEquals("new raw", s.base)
+        assertFalse(s.canUndo)
+        assertFalse(s.isPolished)
+        assertNull(s.activeAction)
     }
 
     @Test
     fun `clear ends the session`() {
-        val s = DictationSession()
-        s.begin("text")
-        s.advance("more")
+        val s = dictated("raw", "Polished.")
+        s.setVariant("VARIANT", "formal")
         s.clear()
         assertFalse(s.isActive)
         assertFalse(s.canUndo)
+        assertFalse(s.canUnpolish)
         assertEquals("", s.current)
     }
 }

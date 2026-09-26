@@ -36,7 +36,8 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onAction: (QuickAction) -> Unit = {}
     var onUndo: () -> Unit = {}
     var onAccept: () -> Unit = {}
-    var onRetryPolish: () -> Unit = {}
+    var onRepolish: () -> Unit = {}
+    var onUnpolish: () -> Unit = {}
     var onOpenSettings: () -> Unit = {}
     var onSwitchKeyboard: () -> Unit = {}
     var onBackspace: () -> Unit = {}
@@ -210,7 +211,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 undoButton.visibility = if (state.canUndo) VISIBLE else GONE
                 doneButton.visibility = VISIBLE
                 customRow.visibility = VISIBLE
-                showReviewActions(enabled = !state.busy)
+                showReviewActions(state, enabled = !state.busy)
             }
         }
     }
@@ -223,11 +224,25 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         actionStrip.addView(chip("↵ Newline") { onNewline() })
     }
 
-    private fun showReviewActions(enabled: Boolean) {
+    /**
+     * The action strip.
+     *
+     * The polish control leads because it changes what everything else acts
+     * on: quick actions transform the base text, and unpolishing swaps the
+     * base from the cleaned-up version to what was actually said.
+     */
+    private fun showReviewActions(state: UiState.Review, enabled: Boolean) {
         actionStrip.removeAllViews()
-        actionStrip.addView(chip("↻ Re-polish", enabled) { onRetryPolish() })
+
+        if (state.canUnpolish) {
+            actionStrip.addView(chip("↩ Undo clean-up", enabled) { onUnpolish() })
+        }
+        actionStrip.addView(
+            chip(if (state.isPolished) "↻ Re-clean" else "✦ Clean up", enabled) { onRepolish() }
+        )
         QuickActions.ALL.forEach { action ->
-            actionStrip.addView(chip(action.label, enabled) { onAction(action) })
+            val on = action.id == state.activeAction
+            actionStrip.addView(chip(action.label, enabled, selected = on) { onAction(action) })
         }
         actionScroll.scrollTo(0, 0)
     }
@@ -241,14 +256,25 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
     // ---- small builders --------------------------------------------------
 
-    private fun chip(label: String, enabled: Boolean = true, onTap: () -> Unit): View =
+    private fun chip(
+        label: String,
+        enabled: Boolean = true,
+        selected: Boolean = false,
+        onTap: () -> Unit,
+    ): View =
         TextView(context).apply {
             text = label
             gravity = Gravity.CENTER
-            setTextColor(if (enabled) FG else FG_FAINT)
+            setTextColor(
+                when {
+                    selected -> Color.WHITE
+                    enabled -> FG
+                    else -> FG_FAINT
+                }
+            )
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(dp(14), 0, dp(14), 0)
-            background = roundedDrawable(SURFACE, dp(11).toFloat())
+            background = roundedDrawable(if (selected) ACCENT else SURFACE, dp(11).toFloat())
             isClickable = enabled
             alpha = if (enabled) 1f else 0.55f
             setOnClickListener { if (enabled) onTap() }

@@ -30,7 +30,8 @@ class Polisher(private val settings: Settings) {
         text: String,
         instruction: String,
         provider: Provider? = null,
-    ): String = run(Prompts.transform(instruction), text, provider)
+        translating: Boolean = false,
+    ): String = run(Prompts.transform(instruction, translating), text, provider)
 
     private suspend fun run(
         system: String,
