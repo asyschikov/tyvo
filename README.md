@@ -11,14 +11,6 @@ and the field gets:
 
 > I am going to cook lasagna.
 
-<p align="center">
-  <img src="docs/screenshots/welcome.png" width="30%" alt="Welcome screen explaining what Tyvo does, with a worked example of a spoken correction" />
-  <img src="docs/screenshots/welcome-steps.png" width="30%" alt="The three setup steps: API key, microphone, and enabling the keyboard" />
-  <img src="docs/screenshots/history.png" width="30%" alt="History, the app's home screen" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/keyboard.png" width="30%" alt="The Tyvo keyboard: status line, Space, Newline and Settings keys, and the Speak button" />
-</p>
 
 ## No backend, and no subscription
 
