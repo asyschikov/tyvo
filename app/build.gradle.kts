@@ -17,9 +17,33 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            // Read from the environment so the keystore password never lands
+            // in a file. Supplied by `secretspec run -- ./gradlew ...`; see
+            // RELEASING.md.
+            val storePath = System.getenv("TYVO_KEYSTORE_PATH")
+            if (storePath != null) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("TYVO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("TYVO_KEY_ALIAS") ?: "tyvo"
+                keyPassword = System.getenv("TYVO_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Only sign when the environment actually carries a keystore, so
+            // an ordinary `assembleRelease` still builds (unsigned) without
+            // the signing secrets present.
+            signingConfig = if (System.getenv("TYVO_KEYSTORE_PATH") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
