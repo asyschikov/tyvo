@@ -77,14 +77,11 @@ correction and measurement in this README came from running against Voxtral
 and Ministral. The others should work just as well — they have simply had
 less use.
 
-It is also cheap enough that the per-use model stops being a compromise. At
-Mistral's published rates, transcription is **$0.003/minute** and
-`ministral-3b` is **$0.10 per million tokens** either way — and a dictated
-sentence is a few hundred tokens, so the clean-up pass rounds to nothing
-against the audio. Ten minutes of dictation a day comes to about **$11 a
-year**; an hour a week is under **$10**. Check the
-[current rates](https://mistral.ai/pricing) before relying on that — these are
-the figures at time of writing, not a promise.
+It is also cheap enough that paying per use stops being a compromise.
+Transcription is **$0.003 a minute** at Mistral's published rates, so ten
+minutes of dictation a day is about **$11 a year**. Check the
+[current rates](https://mistral.ai/pricing) before relying on that — that is
+the figure at time of writing, not a promise.
 
 > **xAI and Gemini are built from their published documentation and have not
 > been run against the live API.** Model IDs, endpoints and response shapes
