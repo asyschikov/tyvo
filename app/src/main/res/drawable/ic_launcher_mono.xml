@@ -1,0 +1,14 @@
+<!--
+  Themed-icon variant. The system tints this one flat colour, so the
+  waveform is punched out of the bubble rather than drawn on top of it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M32,34h44a8,8 0 0 1 8,8v24a8,8 0 0 1 -8,8h-20l-10,10.5l-2.5,-10.5h-11.5a8,8 0 0 1 -8,-8v-24a8,8 0 0 1 8,-8zM39,52a2.5,2.5 0 0 1 5,0v5a2.5,2.5 0 0 1 -5,0zM47.5,46.5a2.5,2.5 0 0 1 5,0v15a2.5,2.5 0 0 1 -5,0zM56,41.5a2.5,2.5 0 0 1 5,0v25a2.5,2.5 0 0 1 -5,0zM64.5,48a2.5,2.5 0 0 1 5,0v13a2.5,2.5 0 0 1 -5,0zM73,53.5a2.5,2.5 0 0 1 5,0v2a2.5,2.5 0 0 1 -5,0z" />
+</vector>

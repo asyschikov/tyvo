@@ -1,8 +1,30 @@
+<!--
+  A speech bubble whose contents are a waveform: voice and message in one
+  mark, which is what "Type Voice" means.
+
+  Drawn inside the adaptive-icon safe zone (the middle 72dp of 108dp), so
+  nothing is lost to a circular, squircle or rounded mask.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M54,30c-4.4,0 -8,3.6 -8,8v16c0,4.4 3.6,8 8,8s8,-3.6 8,-8V38C62,33.6 58.4,30 54,30z"/>
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M68,54c0,7.7 -6.3,14 -14,14s-14,-6.3 -14,-14h-5c0,9.8 7.3,17.9 16.5,19.3V80h5v-6.7C65.7,71.9 73,63.8 73,54H68z"/>
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,34h44a8,8 0 0 1 8,8v24a8,8 0 0 1 -8,8h-20l-10,10.5l-2.5,-10.5h-11.5a8,8 0 0 1 -8,-8v-24a8,8 0 0 1 8,-8z" />
+
+    <group android:name="waveform">
+        <path android:fillColor="#3350D4"
+            android:pathData="M36.5,49.5m0,2.5a2.5,2.5 0 1 1 5,0v5a2.5,2.5 0 1 1 -5,0z" />
+        <path android:fillColor="#3350D4"
+            android:pathData="M45,44m0,2.5a2.5,2.5 0 1 1 5,0v15a2.5,2.5 0 1 1 -5,0z" />
+        <path android:fillColor="#3350D4"
+            android:pathData="M53.5,39m0,2.5a2.5,2.5 0 1 1 5,0v25a2.5,2.5 0 1 1 -5,0z" />
+        <path android:fillColor="#3350D4"
+            android:pathData="M62,45.5m0,2.5a2.5,2.5 0 1 1 5,0v13a2.5,2.5 0 1 1 -5,0z" />
+        <path android:fillColor="#3350D4"
+            android:pathData="M70.5,51m0,2.5a2.5,2.5 0 1 1 5,0v2a2.5,2.5 0 1 1 -5,0z" />
+    </group>
 </vector>
