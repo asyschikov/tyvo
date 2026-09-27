@@ -11,6 +11,12 @@ and the field gets:
 
 > I am going to cook lasagna.
 
+<p align="center">
+  <img src="docs/screenshots/welcome.png" width="30%" alt="Welcome screen explaining what Tyvo does, with a worked example of a spoken correction" />
+  <img src="docs/screenshots/welcome-steps.png" width="30%" alt="The three setup steps: API key, microphone, and enabling the keyboard" />
+  <img src="docs/screenshots/history.png" width="30%" alt="History, the app's home screen" />
+</p>
+
 ## No backend, and no subscription
 
 **There is no server.** Tyvo talks to your AI provider directly from your
@@ -222,6 +228,8 @@ ceiling is higher.
 
 ## Language
 
+<img src="docs/screenshots/language-picker.png" width="30%" align="right" alt="The language picker, searchable by code, English name or endonym" />
+
 One slot, chosen from a searchable list of 45 languages (matching on code,
 English name or endonym). Blank means auto-detect, which is the right setting
 if you switch languages.
@@ -229,6 +237,8 @@ if you switch languages.
 It is one slot rather than a list because the transcription APIs accept
 exactly one code — a list would only ever send its first entry, which is a
 setting that lies about what it does.
+
+<br clear="right" />
 
 ## Vocabulary
 
