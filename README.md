@@ -173,10 +173,36 @@ ceiling is higher.
 
 ## Transcription accuracy
 
-- **Language hint** — ISO code; blank auto-detects. Also cuts latency, since
-  the model skips detection.
-- **Vocabulary** — names and jargon the transcriber keeps mangling. Sent as a
-  biasing prompt (OpenAI) or `context_bias` terms (Mistral).
+- **Vocabulary** — names and jargon the transcriber keeps mangling: product
+  names, colleagues, technical terms. Sent as a biasing prompt (OpenAI) or
+  `context_bias` terms (Mistral, max 100). A nudge, not a dictionary.
+- **Language hint** — an ISO code, shown only on OpenAI, where it is
+  documented to "improve accuracy and latency".
+
+### Why there is no language hint on Mistral
+
+Mistral documents `language` as an accuracy hint layered on top of
+auto-detection, not a constraint — and measured against the live API it has no
+observable effect at all:
+
+| Audio | `language` | Result |
+|---|---|---|
+| Russian | *omitted* | correct Russian |
+| Russian | `en` | byte-identical Russian |
+| Russian | `bg` | byte-identical Russian |
+| Bulgarian | `ru` | byte-identical Bulgarian |
+| Russian with English loanwords | all of the above | identical |
+
+An invalid code like `en,ru` is rejected with `422 Invalid language alpha2
+code`, so it is validated and then apparently unused. The `language` field in
+the *response* is always `null`, even for clear speech with no
+`timestamp_granularities` set — undocumented, and it means there is no
+detection result to act on either.
+
+Auto-detect was correct in every case tested, down to single words, so Tyvo
+omits the parameter on Mistral rather than implying a setting that does
+nothing. Passing a list of preferred languages is not possible on either
+provider.
 
 ## Build
 

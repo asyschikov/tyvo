@@ -483,15 +483,38 @@ private fun SettingsScreen(
 
         // ---- accuracy -----------------------------------------------------
         SectionCard("Transcription accuracy") {
-            OutlinedTextField(
-                value = lang,
-                onValueChange = { lang = it; settings.languageHint = it },
-                label = { Text("Language hint") },
-                placeholder = { Text("blank = auto-detect, e.g. en, ru, de") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions.Default,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Mistral's Voxtral validates the language code and then ignores
+            // it -- verified against the live API: Russian audio sent with
+            // language=en, and even language=bg, came back byte-identical to
+            // auto-detect. Showing the field there would promise something it
+            // does not do.
+            if (provider == Provider.OPENAI) {
+                OutlinedTextField(
+                    value = lang,
+                    onValueChange = { lang = it; settings.languageHint = it },
+                    label = { Text("Language hint") },
+                    placeholder = { Text("blank = auto-detect, e.g. en, ru, de") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "An ISO code for the language you usually dictate in. " +
+                        "Improves accuracy on short phrases and saves the model " +
+                        "a detection step. Leave blank if you switch languages.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    "Voxtral detects the language itself and has no hint to set. " +
+                        "Mixed Russian and English dictation transcribes correctly " +
+                        "without one.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             OutlinedTextField(
                 value = vocab,
                 onValueChange = { vocab = it; settings.vocabulary = it },
@@ -502,7 +525,8 @@ private fun SettingsScreen(
             )
             Text(
                 "Words the transcriber keeps getting wrong: product names, " +
-                    "colleagues, technical terms.",
+                    "colleagues, technical terms. Sent to bias its spelling, " +
+                    "so it is a nudge rather than a guarantee.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
