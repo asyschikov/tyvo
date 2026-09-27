@@ -67,10 +67,16 @@ single API key.
 
 | Provider | Transcription | Clean-up | Tested |
 |---|---|---|---|
+| **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-3b-latest` | ✅ |
 | OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
-| Mistral | `voxtral-mini-latest` | `ministral-3b-latest` | ✅ |
 | xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-build-0.1` | ⚠️ untested |
 | Google Gemini | `gemini-2.5-flash-lite` | `gemini-2.5-flash-lite` | ⚠️ untested |
+
+Mistral is the default and the one everything here was developed against:
+every prompt, every correction and every measurement in this README came from
+running against Voxtral and Ministral. Transcription runs about $0.003/min and
+`ministral-3b` is available on every tier, so a heavy day of dictation costs
+small change.
 
 > **xAI and Gemini are built from their published documentation and have not
 > been run against the live API.** Model IDs, endpoints and response shapes
@@ -197,8 +203,9 @@ Three screens:
 1. Install the APK and open **Tyvo**.
 2. Grant microphone access.
 3. Enable Tyvo in system keyboard settings, then switch to it.
-4. Paste API keys. They are stored in `EncryptedSharedPreferences` and sent
-   only to the provider you selected.
+4. Paste an API key — a [Mistral](https://console.mistral.ai/) one unless you
+   have a reason to prefer another. It is stored in
+   `EncryptedSharedPreferences` and sent only to that provider.
 5. Hit **Test connection** to confirm the key and model work.
 
 ## Corrections
