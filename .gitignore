@@ -13,10 +13,9 @@ release/
 *.keystore
 !debug.keystore
 
-# Signing material. The keystore lives outside the repo; these patterns are a
-# backstop in case one is ever copied in by accident.
+# Signing material. The keystore lives in SecretSpec, not on disk; these
+# patterns are a backstop in case one is ever exported here by accident.
+# secretspec.toml itself is committed: it declares which secrets are needed
+# without containing any of them.
 *.jks
-*.keystore
-!debug.keystore
 keystore.properties
-secretspec.toml
