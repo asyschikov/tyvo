@@ -16,6 +16,9 @@ and the field gets:
   <img src="docs/screenshots/welcome-steps.png" width="30%" alt="The three setup steps: API key, microphone, and enabling the keyboard" />
   <img src="docs/screenshots/history.png" width="30%" alt="History, the app's home screen" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/keyboard.png" width="30%" alt="The Tyvo keyboard: status line, Space, Newline and Settings keys, and the Speak button" />
+</p>
 
 ## No backend, and no subscription
 
