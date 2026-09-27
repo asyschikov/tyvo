@@ -23,7 +23,7 @@ class Polisher(private val settings: Settings) {
 
     /** Clean-up pass: applies spoken corrections, strips filler, punctuates. */
     suspend fun cleanUp(raw: String): String =
-        run(system = Prompts.CLEAN_UP, user = raw)
+        run(system = Prompts.cleanUp(settings.corrections()), user = raw)
 
     /** One-shot rewrite under an arbitrary instruction. */
     suspend fun transform(

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.tyvo.keyboard.polish.Correction
 
 /**
  * The AI provider backing the whole keyboard.
@@ -135,6 +136,25 @@ class Settings(context: Context) {
         get() = plain.getBoolean(KEY_TOAST_FAIL, true)
         set(v) = plain.edit().putBoolean(KEY_TOAST_FAIL, v).apply()
 
+    /**
+     * Which clean-up corrections are enabled, by id.
+     *
+     * Stored as an explicit set rather than a flag per correction so that
+     * adding one later does not silently switch it on for existing users --
+     * an unset value means "never chosen", which falls back to the defaults.
+     */
+    var enabledCorrections: Set<String>
+        get() = plain.getStringSet(KEY_CORRECTIONS, null)
+            ?: Correction.defaults.map { it.id }.toSet()
+        set(v) = plain.edit().putStringSet(KEY_CORRECTIONS, v).apply()
+
+    fun corrections(): Set<Correction> =
+        enabledCorrections.mapNotNull { Correction.byId(it) }.toSet()
+
+    fun setCorrection(c: Correction, on: Boolean) {
+        enabledCorrections = if (on) enabledCorrections + c.id else enabledCorrections - c.id
+    }
+
     /** Spoken language hint (ISO-639-1), blank = auto-detect. */
     var languageHint: String
         get() = plain.getString(KEY_LANG, "").orEmpty()
@@ -162,6 +182,7 @@ class Settings(context: Context) {
         const val KEY_NOTIFY_FAIL = "notify_failures"
         const val KEY_TOAST_FAIL = "toast_failures"
         const val KEY_KEEP_FAILED = "keep_failed_audio"
+        const val KEY_CORRECTIONS = "enabled_corrections"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
     }

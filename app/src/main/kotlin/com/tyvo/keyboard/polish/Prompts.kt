@@ -46,36 +46,52 @@ object Prompts {
         produce.
     """.trimIndent()
 
-    val CLEAN_UP = """
+    /**
+     * Builds the clean-up prompt from the corrections the user has enabled.
+     *
+     * Disabled corrections are left out entirely rather than negated: a
+     * prompt full of "do not do X" reads as a list of things to consider
+     * doing, and small models act on the mention rather than the negation.
+     */
+    fun cleanUp(corrections: Set<Correction>): String {
+        val enabled = Correction.entries.filter { it in corrections }
+        // With everything off there is still a job to do -- the transcript
+        // should come back as it was said, not be handed to a model with an
+        // empty instruction list and left to improvise.
+        val steps = if (enabled.isEmpty()) {
+            "Return the transcript unchanged apart from obvious transcription\n" +
+                "errors. Do not restyle, shorten or punctuate it."
+        } else {
+            enabled.mapIndexed { i, c ->
+                "${i + 1}. ${c.instruction.replace("\n", "\n   ")}"
+            }.joinToString("\n")
+        }
+
+        // Spoken corrections get their own line above the list. Buried as
+        // one item among seven, a small model reliably skipped it and left
+        // the abandoned word in -- and getting that wrong means writing the
+        // opposite of what the speaker asked for.
+        val headline = if (Correction.SPOKEN_EDITS in corrections) {
+            """
+
+        The single most important thing: people correct themselves mid-sentence.
+        When they do, the correction wins and the abandoned words disappear
+        entirely. Check for this before anything else, and check again before
+        you answer -- leaving the discarded word in writes the opposite of what
+        they asked for.
+            """.trimIndent()
+        } else ""
+
+        return """
         You are the dictation engine inside a phone keyboard. Someone is
         speaking into a text field to write a message, note or search query.
         Your output goes straight into that field, so it is always their
         sentence, tidied -- never a response to it.
+        $headline
 
         Apply, in order:
 
-        1. SPOKEN CORRECTIONS. Treat phrases like "sorry no", "I mean", "scratch
-           that", "no wait", "actually make that", "rather" as edit commands.
-           Apply the correction and delete both the command and the text it
-           replaced. Keep every other word of the sentence, including the
-           subject and any leading clause.
-             "I am going to book pasta, sorry no, lasagna"
-               -> "I am going to book lasagna."
-             "let's meet at five, I mean six" -> "Let's meet at six."
-             "email Sarah - scratch that - email Tom" -> "Email Tom."
-        2. FALSE STARTS AND FILLER. Remove "um", "uh", "like" used as filler,
-           stutters, and genuinely abandoned half-sentences. Keep "like" when
-           it carries meaning ("it works like this"). Never drop a subject,
-           auxiliary verb or opening clause just to make the sentence shorter:
-           "um so I was thinking we could ship it friday" keeps "I was
-           thinking we could" and becomes
-           "So I was thinking we could ship it Friday."
-        3. PUNCTUATION AND CAPITALISATION. Add what speech does not carry.
-           Honour spoken punctuation words ("period", "comma", "new line",
-           "question mark") by converting them into the actual mark, but only
-           when they are clearly meant as dictation commands rather than
-           content.
-        4. LIGHT GRAMMAR. Fix agreement and obvious transcription slips.
+        $steps
 
         Hard rules:
         - Preserve the speaker's voice, vocabulary and register. Do not
@@ -83,6 +99,10 @@ object Prompts {
           not reorder ideas, do not add information.
         - Do not shorten. Apart from corrections and filler, the output should
           contain the same words as the input.
+        - LANGUAGE (absolute): detect the transcript's language and write the
+          output in that same language and script. These instructions are in
+          English; that is not a reason to switch the text to English, nor to
+          switch it away from English. Never translate or transliterate.
         - You are a text field, not a chat partner. The user is dictating a
           message to somebody else, so every transcript comes back as edited
           text -- there is no case where a reply is the right output. A
@@ -94,14 +114,11 @@ object Prompts {
         - Your output must be the user's own sentence and nothing else. Never
           add words, sentences or examples that were not in the transcript --
           including anything from these instructions.
-        - LANGUAGE (absolute): detect the transcript's language and write the
-          output in that same language and script. These instructions are in
-          English; that is not a reason to switch the text to English, nor to
-          switch it away from English. Never translate or transliterate.
-        - If the transcript is already clean, return it unchanged.
+        - If the transcript already reads correctly, return it unchanged.
 
         Return only the cleaned text. No preamble, no quotes, no commentary.
-    """.trimIndent()
+        """.trimIndent()
+    }
 
     /**
      * Built for one-shot rewrites of an existing block of text, where the

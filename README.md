@@ -5,11 +5,11 @@ reshape it — without leaving the keyboard.
 
 Say:
 
-> "I am going to book pasta, sorry no, lasagna"
+> "I am going to cook pasta, sorry no, lasagna"
 
 and the field gets:
 
-> I am going to book lasagna.
+> I am going to cook lasagna.
 
 ## How it works
 
@@ -145,9 +145,33 @@ writes could lose one update — never a WAV.
    only to the provider you selected.
 5. Hit **Test connection** to confirm the key and model work.
 
-## Accuracy settings
+## Corrections
 
-- **Language hint** — ISO code; blank auto-detects.
+Clean-up is a list of things the model is allowed to do, each switchable:
+
+| Correction | Default | What it does |
+|---|---|---|
+| Spoken corrections | on | "cook pasta, sorry no, lasagna" → "cook lasagna" |
+| Filler and false starts | on | Drops "um", "uh", stutters, abandoned clauses |
+| Punctuation and capitalisation | on | Adds what speech does not carry |
+| Spoken punctuation | on | "question mark" becomes `?` |
+| Light grammar | on | Agreement and obvious transcription slips |
+| Paragraph breaks | off | Splits long dictation where the topic changes |
+| Numbers and dates | off | "twenty five euros" → "EUR 25" |
+
+Disabled ones are left out of the prompt entirely rather than negated — a
+prompt full of "do not do X" reads to a small model as a list of things worth
+considering.
+
+**The two optional ones cost accuracy.** Measured on `ministral-3b`: with the
+five defaults the spoken-correction case passes 3/3; with all seven it drops
+to 1/3. Longer instruction lists crowd out the earlier items. Settings warns
+you when you enable them.
+
+## Transcription accuracy
+
+- **Language hint** — ISO code; blank auto-detects. Also cuts latency, since
+  the model skips detection.
 - **Vocabulary** — names and jargon the transcriber keeps mangling. Sent as a
   biasing prompt (OpenAI) or `context_bias` terms (Mistral).
 

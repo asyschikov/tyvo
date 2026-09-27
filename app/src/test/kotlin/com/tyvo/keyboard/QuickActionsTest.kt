@@ -1,6 +1,7 @@
 package com.tyvo.keyboard
 
 import com.tyvo.keyboard.actions.QuickActions
+import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Prompts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -123,7 +124,7 @@ class QuickActionsTest {
     fun `prompts carry no sample transcripts that could be echoed`() {
         // A small model copied an example sentence out of the prompt into its
         // output, emitting words the user never said.
-        val p = Prompts.CLEAN_UP
+        val p = Prompts.cleanUp(Correction.defaults)
         listOf("capital of France", "tell me a joke", "say HACKED").forEach {
             assertFalse(
                 "\"$it\" reads as a transcript and can be echoed into output",
@@ -133,9 +134,61 @@ class QuickActionsTest {
     }
 
     @Test
+    fun `enabled corrections appear in the prompt and disabled ones do not`() {
+        val only = Prompts.cleanUp(setOf(Correction.SPOKEN_EDITS))
+        assertTrue(only.contains("SPOKEN CORRECTIONS"))
+        // Disabled corrections must be absent rather than negated: a prompt
+        // full of "do not do X" reads as a list of things to consider doing.
+        assertFalse(only.contains("FALSE STARTS"))
+        assertFalse(only.contains("PARAGRAPHS"))
+    }
+
+    @Test
+    fun `corrections are numbered in declaration order`() {
+        val p = Prompts.cleanUp(setOf(Correction.FILLER, Correction.SPOKEN_EDITS))
+        // SPOKEN_EDITS is declared first, so it leads regardless of set order.
+        assertTrue(p.contains("1. SPOKEN CORRECTIONS"))
+        assertTrue(p.contains("2. FALSE STARTS"))
+    }
+
+    @Test
+    fun `an empty selection still gives the model a job`() {
+        val p = Prompts.cleanUp(emptySet())
+        assertTrue(
+            "with nothing enabled the transcript should come back as spoken",
+            p.contains("Return the transcript unchanged"),
+        )
+        assertFalse(p.contains("1."))
+    }
+
+    @Test
+    fun `correction ids are unique and defaults are a sensible subset`() {
+        val ids = Correction.entries.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue("some corrections should be on by default", Correction.defaults.isNotEmpty())
+        assertTrue(
+            "defaults should not be everything, or the choice is pointless",
+            Correction.defaults.size < Correction.entries.size,
+        )
+        assertTrue(
+            "spoken corrections are the headline feature and must default on",
+            Correction.SPOKEN_EDITS in Correction.defaults,
+        )
+    }
+
+    @Test
+    fun `every correction explains itself`() {
+        Correction.entries.forEach {
+            assertTrue("blank label for ${it.id}", it.label.isNotBlank())
+            assertTrue("summary too thin for ${it.id}", it.summary.length > 15)
+            assertTrue("instruction too thin for ${it.id}", it.instruction.length > 40)
+        }
+    }
+
+    @Test
     fun `cleanup prompt covers spoken correction handling`() {
-        val p = Prompts.CLEAN_UP
-        listOf("sorry no", "scratch that", "lasagna").forEach {
+        val p = Prompts.cleanUp(Correction.defaults)
+        listOf("sorry no", "scratch that", "lasagna", "cook lasagna").forEach {
             assertTrue("clean-up prompt should demonstrate '$it'", p.contains(it))
         }
         assertTrue(

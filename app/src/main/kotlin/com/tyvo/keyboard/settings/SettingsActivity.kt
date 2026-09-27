@@ -37,6 +37,7 @@ import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
 import kotlinx.coroutines.launch
+import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
 
@@ -115,6 +116,7 @@ private fun SettingsScreen(
     var notifyOnFail by remember { mutableStateOf(settings.failureNotifications) }
     var toastOnFail by remember { mutableStateOf(settings.failureToasts) }
     var keepFailed by remember { mutableStateOf(settings.keepFailedAudio) }
+    var corrections by remember { mutableStateOf(settings.corrections()) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -287,7 +289,8 @@ private fun SettingsScreen(
         SectionCard("AI provider") {
             Text(
                 "One provider handles both transcription and clean-up, so you " +
-                    "only ever need a single API key.",
+                    "only ever need a single API key. Everything below applies " +
+                    "to whichever you pick here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -300,7 +303,10 @@ private fun SettingsScreen(
                     testResult = null
                 },
             )
+        }
 
+        // ---- everything for the selected provider -------------------------
+        SectionCard(provider.label) {
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it; settings.setKey(provider, it) },
@@ -348,10 +354,9 @@ private fun SettingsScreen(
                     Text(it, style = MaterialTheme.typography.bodySmall)
                 }
             }
-        }
 
-        // ---- models -------------------------------------------------------
-        SectionCard("Models") {
+            HorizontalDivider()
+
             Text(
                 "Transcription — turns your voice into text.",
                 style = MaterialTheme.typography.bodySmall,
@@ -366,8 +371,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(4.dp))
             Text(
-                "Clean-up — applies spoken corrections (\"book pasta, sorry no, " +
-                    "lasagna\"), removes filler, and punctuates.",
+                "Clean-up — turns what you said into what you meant to write.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -389,6 +393,69 @@ private fun SettingsScreen(
                     default = Polisher.defaultModelFor(provider),
                     onSelect = { pModel = it; settings.setPolishModel(provider, it) },
                 )
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Corrections",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    val allOn = corrections.size == Correction.entries.size
+                    TextButton(onClick = {
+                        val next = if (allOn) emptySet() else Correction.entries.toSet()
+                        corrections = next
+                        settings.enabledCorrections = next.map { it.id }.toSet()
+                    }) { Text(if (allOn) "None" else "All") }
+                }
+                Correction.entries.forEach { c ->
+                    val on = c in corrections
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = on,
+                            onCheckedChange = { checked ->
+                                settings.setCorrection(c, checked)
+                                corrections = settings.corrections()
+                            },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Column {
+                            Text(c.label, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                c.summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                // Measured, not guessed: on a small model, seven corrections
+                // drops the spoken-correction hit rate from 3/3 to 1/3.
+                val heavy = corrections.count { !it.defaultOn } > 0 &&
+                    corrections.size > Correction.defaults.size
+                if (heavy) {
+                    Text(
+                        "More corrections means a longer instruction list, and " +
+                            "smaller models start dropping the earlier ones. If " +
+                            "self-corrections stop being applied, switch off the " +
+                            "extras or pick a larger model.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (corrections.isEmpty()) {
+                    Text(
+                        "With nothing selected the transcript is returned as " +
+                            "spoken, apart from obvious transcription errors.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
@@ -414,7 +481,7 @@ private fun SettingsScreen(
         }
 
         // ---- accuracy -----------------------------------------------------
-        SectionCard("Accuracy") {
+        SectionCard("Transcription accuracy") {
             OutlinedTextField(
                 value = lang,
                 onValueChange = { lang = it; settings.languageHint = it },
