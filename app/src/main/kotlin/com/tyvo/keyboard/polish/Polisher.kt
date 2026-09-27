@@ -40,10 +40,11 @@ class Polisher(private val settings: Settings) {
     ): String =
         withContext(Dispatchers.IO) {
             if (user.isBlank()) return@withContext user
+            val wrapped = Prompts.wrapInput(user)
             val p = override ?: settings.provider
             when (p) {
-                Provider.OPENAI -> openAi(system, user, modelFor(p, override))
-                Provider.MISTRAL -> mistral(system, user, modelFor(p, override))
+                Provider.OPENAI -> openAi(system, wrapped, user, modelFor(p, override))
+                Provider.MISTRAL -> mistral(system, wrapped, user, modelFor(p, override))
             }
         }
 
@@ -65,7 +66,7 @@ class Polisher(private val settings: Settings) {
 
     // ---- OpenAI ---------------------------------------------------------
 
-    private fun openAi(system: String, user: String, model: String): String {
+    private fun openAi(system: String, sent: String, original: String, model: String): String {
         val key = settings.key(Provider.OPENAI)
         if (key.isBlank()) throw TyvoException("Add an OpenAI API key in Tyvo settings.")
 
@@ -76,7 +77,7 @@ class Polisher(private val settings: Settings) {
                 "messages",
                 JSONArray()
                     .put(JSONObject().put("role", "system").put("content", system))
-                    .put(JSONObject().put("role", "user").put("content", user)),
+                    .put(JSONObject().put("role", "user").put("content", sent)),
             )
         }
 
@@ -92,12 +93,12 @@ class Polisher(private val settings: Settings) {
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-        return text.trim().ifBlank { user }
+        return text.trim().ifBlank { original }
     }
 
     // ---- Mistral --------------------------------------------------------
 
-    private fun mistral(system: String, user: String, model: String): String {
+    private fun mistral(system: String, sent: String, original: String, model: String): String {
         val key = settings.key(Provider.MISTRAL)
         if (key.isBlank()) throw TyvoException("Add a Mistral API key in Tyvo settings.")
 
@@ -108,7 +109,7 @@ class Polisher(private val settings: Settings) {
                 "messages",
                 JSONArray()
                     .put(JSONObject().put("role", "system").put("content", system))
-                    .put(JSONObject().put("role", "user").put("content", user)),
+                    .put(JSONObject().put("role", "user").put("content", sent)),
             )
         }
 
@@ -124,7 +125,7 @@ class Polisher(private val settings: Settings) {
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-        return text.trim().ifBlank { user }
+        return text.trim().ifBlank { original }
     }
 
     companion object {
