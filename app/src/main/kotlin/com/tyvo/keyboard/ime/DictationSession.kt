@@ -4,8 +4,14 @@ package com.tyvo.keyboard.ime
  * What the keyboard is doing right now. The UI renders directly off this.
  */
 sealed interface UiState {
-    /** Ready, nothing in flight. [lastError] shows a dismissed-on-next-action note. */
-    data class Idle(val lastError: String? = null) : UiState
+    /**
+     * Ready, nothing in flight. [lastError] shows a dismissed-on-next-action
+     * note, and [canRetry] offers another go at a recording that failed.
+     */
+    data class Idle(
+        val lastError: String? = null,
+        val canRetry: Boolean = false,
+    ) : UiState
 
     data class Recording(val elapsedMs: Long) : UiState
 

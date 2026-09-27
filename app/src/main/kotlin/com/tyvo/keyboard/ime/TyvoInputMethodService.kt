@@ -17,6 +17,8 @@ import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
 import com.tyvo.keyboard.data.Settings
+import com.tyvo.keyboard.history.Notifications
+import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.net.TyvoException
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.settings.SettingsActivity
@@ -63,6 +65,10 @@ class TyvoInputMethodService : InputMethodService() {
     private lateinit var recorder: AudioRecorder
     private lateinit var transcriber: Transcriber
     private lateinit var polisher: Polisher
+    private lateinit var store: RecordingStore
+
+    /** Most recent failed recording, retryable straight from the keyboard. */
+    private var lastFailedId: String? = null
 
     private val session = DictationSession()
     private var view: KeyboardView? = null
@@ -82,6 +88,7 @@ class TyvoInputMethodService : InputMethodService() {
         recorder = AudioRecorder(cacheDir)
         transcriber = Transcriber(settings)
         polisher = Polisher(settings)
+        store = RecordingStore(this)
     }
 
     override fun onCreateInputView(): View {
@@ -92,6 +99,7 @@ class TyvoInputMethodService : InputMethodService() {
         v.onAccept = { acceptSession() }
         v.onRepolish = { repolish() }
         v.onUnpolish = { unpolish() }
+        v.onRetry = { retryLast() }
         v.onOpenSettings = { openSettings() }
         v.onSwitchKeyboard = { switchAway() }
         v.onBackspace = { backspace() }
@@ -167,6 +175,7 @@ class TyvoInputMethodService : InputMethodService() {
     private fun stopAndProcess() {
         if (!recorder.isRecording) return
         ticker?.cancel()
+        val durationMs = System.currentTimeMillis() - recorder.startedAtMs
         val file = recorder.stop()
         haptic()
         if (file == null) {
@@ -177,7 +186,7 @@ class TyvoInputMethodService : InputMethodService() {
             )
             return
         }
-        process(file)
+        process(file, durationMs)
     }
 
     private fun abortRecording() {
@@ -187,19 +196,46 @@ class TyvoInputMethodService : InputMethodService() {
 
     // ---- Pipeline -------------------------------------------------------
 
-    private fun process(audio: File) {
+    /**
+     * Transcribes a finished recording and puts the result in the field.
+     *
+     * The recording is handed to the store *before* the network is touched,
+     * so a dead connection, a crash, or the system killing us mid-request
+     * cannot destroy what the user said. The audio is deleted only once text
+     * exists to replace it.
+     */
+    private fun process(audio: File, durationMs: Long) {
+        val recording = try {
+            store.addPending(audio, durationMs)
+        } catch (e: Exception) {
+            // Even if indexing fails, still try to transcribe rather than
+            // dropping the dictation on the floor.
+            null
+        }
+        transcribeRecording(recording?.id, recording?.let { store.audioFor(it) } ?: audio)
+    }
+
+    /** Runs transcription plus the polish pass for one stored recording. */
+    private fun transcribeRecording(recordingId: String?, audio: File) {
         pipeline?.cancel()
         pipeline = scope.launch {
             try {
                 render(UiState.Working("Transcribing"))
                 val raw = transcriber.transcribe(audio)
                 if (raw.isBlank()) {
-                    render(UiState.Idle("Nothing heard."))
+                    // Nothing heard is a real outcome, not a failure: keep the
+                    // audio so the user can check for themselves.
+                    recordingId?.let { store.markFailed(it, "No speech detected.") }
+                    lastFailedId = recordingId
+                    notifyFailure()
+                    render(UiState.Idle("Nothing heard. Saved to Tyvo.", canRetry = true))
                     return@launch
                 }
 
-                val shouldPolish = settings.autoPolish && settings.polishEnabled
+                recordingId?.let { store.markDone(it, raw) }
+                lastFailedId = null
 
+                val shouldPolish = settings.autoPolish && settings.polishEnabled
                 if (!shouldPolish) {
                     commitFresh(raw)
                     render(reviewOrIdle())
@@ -219,16 +255,49 @@ class TyvoInputMethodService : InputMethodService() {
                 }
                 if (polished != raw && replaceCommitted(polished)) {
                     session.setPolished(polished)
+                    recordingId?.let { store.updateText(it, polished) }
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(UiState.Idle(e.message))
+                failRecording(recordingId, e.message ?: "Transcription failed.")
             } catch (e: Exception) {
-                render(UiState.Idle("Something went wrong."))
-            } finally {
-                audio.delete()
+                failRecording(recordingId, "Transcription failed.")
             }
         }
+    }
+
+    /**
+     * Reports a failed transcription without losing the audio.
+     *
+     * The keyboard offers an immediate retry, and a notification points at
+     * the app for later -- the recording is safe either way.
+     */
+    private fun failRecording(recordingId: String?, message: String) {
+        recordingId?.let { store.markFailed(it, message) }
+        lastFailedId = recordingId
+        notifyFailure()
+        render(
+            UiState.Idle(
+                lastError = if (recordingId != null) "$message Saved - tap Retry." else message,
+                canRetry = recordingId != null,
+            )
+        )
+    }
+
+    /** Retries the most recent failure, straight from the keyboard. */
+    private fun retryLast() {
+        val id = lastFailedId ?: return
+        val rec = store.get(id) ?: return
+        val audio = store.audioFor(rec) ?: run {
+            render(UiState.Idle("Recording is no longer available."))
+            lastFailedId = null
+            return
+        }
+        transcribeRecording(id, audio)
+    }
+
+    private fun notifyFailure() {
+        Notifications.transcriptionFailed(this, store.needingAttention().size)
     }
 
     private fun runAction(action: QuickAction) =
@@ -473,7 +542,8 @@ class TyvoInputMethodService : InputMethodService() {
         }
 
     private fun stateForIdle(): UiState =
-        if (session.isActive) reviewOrIdle() else UiState.Idle()
+        if (session.isActive) reviewOrIdle()
+        else UiState.Idle(canRetry = lastFailedId != null)
 
     private fun render(state: UiState) {
         view?.render(state)

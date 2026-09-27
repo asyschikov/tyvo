@@ -38,6 +38,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onAccept: () -> Unit = {}
     var onRepolish: () -> Unit = {}
     var onUnpolish: () -> Unit = {}
+    var onRetry: () -> Unit = {}
     var onOpenSettings: () -> Unit = {}
     var onSwitchKeyboard: () -> Unit = {}
     var onBackspace: () -> Unit = {}
@@ -169,14 +170,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
                 customRow.visibility = GONE
-                showIdleActions()
+                showIdleActions(state.canRetry)
             }
 
             is UiState.Recording -> {
                 status.text = "Listening   ${fmt(state.elapsedMs)}"
                 status.setTextColor(REC)
                 waveform.visibility = VISIBLE
-                micButton.text = "Stop"
+                micButton.text = "Done"
                 micButton.background = roundedDrawable(REC, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
@@ -218,8 +219,13 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
     // ---- action strips --------------------------------------------------
 
-    private fun showIdleActions() {
+    private fun showIdleActions(canRetry: Boolean) {
         actionStrip.removeAllViews()
+        // Retry leads: a saved recording is unfinished work, and burying it
+        // behind the app is how a dictation quietly gets forgotten.
+        if (canRetry) {
+            actionStrip.addView(chip("↻ Retry", selected = true) { onRetry() })
+        }
         actionStrip.addView(chip("Settings") { onOpenSettings() })
         actionStrip.addView(chip("↵ Newline") { onNewline() })
     }

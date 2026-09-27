@@ -91,6 +91,27 @@ translate English input into it. Only "→ English" is allowed to change
 language, and a typed instruction relaxes the lock only when it actually asks
 for a translation.
 
+## Nothing is lost
+
+A failed transcription used to destroy the recording, so the words were simply
+gone. Now audio is written to the store and indexed **before** the network is
+touched, and deleted only once text exists to replace it. Losing signal,
+crashing, or being killed mid-request cannot take a dictation with it.
+
+When transcription fails:
+
+- the keyboard shows the error and a **Retry** chip, so you can try again
+  without leaving the field
+- a notification says the recording was saved, and opens straight into History
+- the recording waits in **History** with its audio, retryable or exportable
+
+**History** lists every dictation, newest first, with unfinished ones pinned to
+the top. Transcribed entries keep their text and can be copied; failed and
+pending ones keep their WAV and offer Retry and Save audio.
+
+Successful recordings discard their audio once transcribed — the text is what
+you wanted, and 16 kHz mono runs about 1.9 MB per minute.
+
 ## Setup
 
 1. Install the APK and open **Tyvo**.

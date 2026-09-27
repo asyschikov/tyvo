@@ -30,6 +30,8 @@ import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
+import com.tyvo.keyboard.history.HistoryRoute
+import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
 import kotlinx.coroutines.launch
@@ -39,23 +41,60 @@ import com.tyvo.keyboard.transcribe.Transcriber
 class SettingsActivity : ComponentActivity() {
 
     private lateinit var settings: Settings
+    private lateinit var store: RecordingStore
+
+    companion object {
+        /** Deep link from the failed-transcription notification. */
+        const val ACTION_SHOW_HISTORY = "com.tyvo.keyboard.SHOW_HISTORY"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settings = Settings(this)
+        store = RecordingStore(this)
+
+        val startOnHistory = intent?.action == ACTION_SHOW_HISTORY
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SettingsScreen(settings, this)
+                    var showHistory by remember { mutableStateOf(startOnHistory) }
+                    if (showHistory) {
+                        HistoryRoute(
+                            store = store,
+                            settings = settings,
+                            onBack = { showHistory = false },
+                        )
+                    } else {
+                        SettingsScreen(
+                            settings = settings,
+                            activity = this,
+                            store = store,
+                            onOpenHistory = { showHistory = true },
+                        )
+                    }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Recreate so a notification tap lands on History even when the
+        // activity was already open on Settings.
+        if (intent.action == ACTION_SHOW_HISTORY) recreate()
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
+private fun SettingsScreen(
+    settings: Settings,
+    activity: ComponentActivity,
+    store: RecordingStore,
+    onOpenHistory: () -> Unit,
+) {
     val ctx = activity as Context
 
     var provider by remember { mutableStateOf(settings.provider) }
@@ -85,6 +124,20 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
     val micLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { micGranted = it }
+
+    // Asked for alongside the mic so the failed-dictation notification can
+    // actually be posted; refusing it costs the notification, nothing else.
+    var notifyGranted by remember {
+        mutableStateOf(
+            android.os.Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(
+                    ctx, android.Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val notifyLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { notifyGranted = it }
 
     Column(
         Modifier
@@ -125,6 +178,16 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                 button = "Grant",
                 onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
             )
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                SetupRow(
+                    done = notifyGranted,
+                    label = "Alerts for failed dictations",
+                    button = "Allow",
+                    onClick = {
+                        notifyLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                )
+            }
             SetupRow(
                 done = isImeEnabled(ctx),
                 label = "Enable Tyvo in system settings",
@@ -143,6 +206,31 @@ private fun SettingsScreen(settings: Settings, activity: ComponentActivity) {
                         .showInputMethodPicker()
                 },
             )
+        }
+
+        // ---- history -----------------------------------------------------
+        val pending = remember { store.needingAttention().size }
+        SectionCard("Recordings") {
+            Text(
+                "Every dictation is saved here. Anything that could not be " +
+                    "transcribed keeps its audio so it can be retried.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (pending > 0) {
+                    Text(
+                        if (pending == 1) "1 needs attention" else "$pending need attention",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = onOpenHistory) { Text("Open history") }
+            }
         }
 
         // ---- provider ----------------------------------------------------
