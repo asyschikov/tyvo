@@ -265,6 +265,16 @@ private fun SettingsScreen(
 
         // ---- everything for the selected provider -------------------------
         SectionCard(provider.label) {
+            if (!provider.verified) {
+                Text(
+                    "${provider.label} is built from its published docs but has " +
+                        "not been tested against the live API yet. If it fails, " +
+                        "the error will say why, and OpenAI and Mistral are known " +
+                        "to work.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it; settings.setKey(provider, it) },

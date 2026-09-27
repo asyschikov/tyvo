@@ -4,6 +4,7 @@ import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.net.Http
 import com.tyvo.keyboard.net.TyvoException
+import com.tyvo.keyboard.transcribe.Transcriber
 import com.tyvo.keyboard.usage.UsageEvent
 import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,14 @@ class Polisher(
             when (p) {
                 Provider.OPENAI -> openAi(system, wrapped, user, modelFor(p, override))
                 Provider.MISTRAL -> mistral(system, wrapped, user, modelFor(p, override))
+                // xAI's chat API is OpenAI-shaped, so it differs only in host.
+                Provider.XAI -> chat(
+                    system, wrapped, user, modelFor(p, override),
+                    url = "https://api.x.ai/v1/chat/completions",
+                    key = settings.key(Provider.XAI),
+                    label = "xAI",
+                )
+                Provider.GEMINI -> gemini(system, wrapped, user, modelFor(p, override))
             }
         }
 
@@ -72,9 +81,30 @@ class Polisher(
 
     // ---- OpenAI ---------------------------------------------------------
 
-    private fun openAi(system: String, sent: String, original: String, model: String): String {
-        val key = settings.key(Provider.OPENAI)
-        if (key.isBlank()) throw TyvoException("Add an OpenAI API key in Tyvo settings.")
+    private fun openAi(system: String, sent: String, original: String, model: String): String =
+        chat(system, sent, original, model,
+            url = "https://api.openai.com/v1/chat/completions",
+            key = settings.key(Provider.OPENAI), label = "OpenAI")
+
+    private fun mistral(system: String, sent: String, original: String, model: String): String =
+        chat(system, sent, original, model,
+            url = "https://api.mistral.ai/v1/chat/completions",
+            key = settings.key(Provider.MISTRAL), label = "Mistral")
+
+    /**
+     * One OpenAI-shaped chat call. OpenAI, Mistral and xAI differ only in
+     * host and key, so they share this.
+     */
+    private fun chat(
+        system: String,
+        sent: String,
+        original: String,
+        model: String,
+        url: String,
+        key: String,
+        label: String,
+    ): String {
+        if (key.isBlank()) throw TyvoException("Add a $label API key in Tyvo settings.")
 
         val payload = JSONObject().apply {
             put("model", model)
@@ -88,13 +118,13 @@ class Polisher(
         }
 
         val req = Request.Builder()
-            .url("https://api.openai.com/v1/chat/completions")
+            .url(url)
             .addHeader("Authorization", "Bearer $key")
             .post(payload.toString().toRequestBody(JSON))
             .build()
 
         val json = Http.json(req, "Polish")
-        usage?.record(UsageStore.eventFrom(json, "OpenAI", model, UsageEvent.Kind.POLISH))
+        usage?.record(UsageStore.eventFrom(json, label, model, UsageEvent.Kind.POLISH))
         val text = json.optJSONArray("choices")
             ?.optJSONObject(0)
             ?.optJSONObject("message")
@@ -103,37 +133,47 @@ class Polisher(
         return stripDashes(text.trim()).ifBlank { original }
     }
 
-    // ---- Mistral --------------------------------------------------------
-
-    private fun mistral(system: String, sent: String, original: String, model: String): String {
-        val key = settings.key(Provider.MISTRAL)
-        if (key.isBlank()) throw TyvoException("Add a Mistral API key in Tyvo settings.")
+    /**
+     * Gemini's generateContent, which takes the system prompt as a separate
+     * systemInstruction rather than a message with a role.
+     *
+     * UNVERIFIED against the live API.
+     */
+    private fun gemini(system: String, sent: String, original: String, model: String): String {
+        val key = settings.key(Provider.GEMINI)
+        if (key.isBlank()) throw TyvoException("Add a Gemini API key in Tyvo settings.")
 
         val payload = JSONObject().apply {
-            put("model", model)
-            put("temperature", 0)
             put(
-                "messages",
-                JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", system))
-                    .put(JSONObject().put("role", "user").put("content", sent)),
+                "systemInstruction",
+                JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))),
+            )
+            put(
+                "contents",
+                JSONArray().put(
+                    JSONObject().put(
+                        "parts",
+                        JSONArray().put(JSONObject().put("text", sent)),
+                    )
+                )
+            )
+            put(
+                "generationConfig",
+                JSONObject()
+                    .put("temperature", 0)
+                    .put("maxOutputTokens", maxTokens(original)),
             )
         }
 
         val req = Request.Builder()
-            .url("https://api.mistral.ai/v1/chat/completions")
-            .addHeader("Authorization", "Bearer $key")
+            .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
+            .addHeader("x-goog-api-key", key)
             .post(payload.toString().toRequestBody(JSON))
             .build()
 
         val json = Http.json(req, "Polish")
-        usage?.record(UsageStore.eventFrom(json, "Mistral", model, UsageEvent.Kind.POLISH))
-        val text = json.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content")
-            .orEmpty()
-        return stripDashes(text.trim()).ifBlank { original }
+        usage?.record(Transcriber.geminiUsage(json, model, UsageEvent.Kind.POLISH))
+        return stripDashes(Transcriber.geminiText(json)).ifBlank { original }
     }
 
     companion object {
@@ -161,9 +201,14 @@ class Polisher(
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
         const val DEFAULT_MISTRAL_MODEL = "ministral-3b-latest"
 
+        const val DEFAULT_XAI_MODEL = "grok-build-0.1"
+        const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
         fun defaultModelFor(p: Provider): String = when (p) {
             Provider.OPENAI -> DEFAULT_OPENAI_MODEL
             Provider.MISTRAL -> DEFAULT_MISTRAL_MODEL
+            Provider.XAI -> DEFAULT_XAI_MODEL
+            Provider.GEMINI -> DEFAULT_GEMINI_MODEL
         }
     }
 }

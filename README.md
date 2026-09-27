@@ -73,10 +73,25 @@ the keyboard feel broken.
 You pick **one** provider; it handles both stages, so you only ever hold a
 single API key.
 
-| Provider  | Transcription | Clean-up |
-|-----------|---------------|----------|
-| OpenAI    | `gpt-4o-mini-transcribe` | `gpt-4o-mini` |
-| Mistral   | `voxtral-mini-latest`    | `ministral-3b-latest` |
+| Provider | Transcription | Clean-up | Tested |
+|---|---|---|---|
+| OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
+| Mistral | `voxtral-mini-latest` | `ministral-3b-latest` | ✅ |
+| xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-build-0.1` | ⚠️ untested |
+| Google Gemini | `gemini-2.5-flash-lite` | `gemini-2.5-flash-lite` | ⚠️ untested |
+
+> **xAI and Gemini are built from their published documentation and have not
+> been run against the live API.** Model IDs, endpoints and response shapes
+> are as documented rather than as observed, so any of them may be wrong.
+> Settings shows a warning when one is selected. Mistral was verified against
+> the real API throughout — including finding that it silently ignores the
+> `language` parameter — so treat the unverified pair with the same
+> suspicion until someone has dictated through them.
+>
+> Gemini is the odd one out structurally: it has no transcription endpoint at
+> all, so audio is base64'd into an ordinary `generateContent` call and the
+> model is asked to transcribe it. It also authenticates with `x-goog-api-key`
+> rather than a bearer token, and caps inline audio at 20 MB.
 
 Keys and model choices are stored **per provider**, so switching to the other
 one and back does not cost you a key you already pasted in.

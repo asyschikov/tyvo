@@ -110,13 +110,47 @@ object ModelCatalog {
         ),
     )
 
+    val XAI_TRANSCRIBE = listOf(
+        ModelOption(
+            "grok-voice-transcribe-2.0",
+            "Grok Voice Transcribe",
+            "23 languages, Russian and English among them.",
+        ),
+    )
+
+    val XAI_POLISH = listOf(
+        ModelOption("grok-build-0.1", "Grok Build", "Fast and capable at short rewrites."),
+    )
+
+    val GEMINI_TRANSCRIBE = listOf(
+        ModelOption(
+            "gemini-2.5-flash-lite",
+            "Gemini Flash Lite",
+            "Cheapest option. Audio is billed as tokens.",
+        ),
+        ModelOption(
+            "gemini-2.5-flash",
+            "Gemini Flash",
+            "More accurate on noisy or accented speech.",
+        ),
+    )
+
+    val GEMINI_POLISH = listOf(
+        ModelOption("gemini-2.5-flash-lite", "Gemini Flash Lite", "Fastest and cheapest."),
+        ModelOption("gemini-2.5-flash", "Gemini Flash", "Better at awkward corrections."),
+    )
+
     fun transcribeFor(p: Provider): List<ModelOption> = when (p) {
         Provider.OPENAI -> OPENAI_TRANSCRIBE
         Provider.MISTRAL -> MISTRAL_TRANSCRIBE
+        Provider.XAI -> XAI_TRANSCRIBE
+        Provider.GEMINI -> GEMINI_TRANSCRIBE
     }
 
     fun polishFor(p: Provider): List<ModelOption> = when (p) {
         Provider.OPENAI -> OPENAI_POLISH
         Provider.MISTRAL -> MISTRAL_POLISH
+        Provider.XAI -> XAI_POLISH
+        Provider.GEMINI -> GEMINI_POLISH
     }
 }
