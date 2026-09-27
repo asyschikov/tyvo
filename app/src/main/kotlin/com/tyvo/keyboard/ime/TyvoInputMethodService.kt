@@ -253,19 +253,24 @@ class TyvoInputMethodService : InputMethodService() {
                     return@launch
                 }
 
-                // Commit the raw text first so it appears immediately, then
-                // swap in the polished version. Waiting for the LLM before
-                // showing anything makes the keyboard feel broken.
-                commitFresh(raw)
-                render(UiState.Working("Polishing"))
+                // Nothing is inserted until the text is final. Committing the
+                // raw transcript first and swapping it a second later puts
+                // visibly wrong words in someone's message and rewrites them
+                // under the cursor, which reads as a glitch even though it is
+                // faster.
+                render(UiState.Working("Cleaning up"))
                 val polished = try {
                     polisher.cleanUp(raw)
                 } catch (e: TyvoException) {
+                    // Clean-up failed, but the words are good: insert them
+                    // rather than making the user dictate again.
+                    commitFresh(raw)
                     render(reviewOrIdle(note = e.message))
                     return@launch
                 }
-                if (polished != raw && replaceCommitted(polished)) {
-                    session.setPolished(polished)
+
+                commitFresh(polished, transcript = raw)
+                if (polished != raw) {
                     recordingId?.let { store.updateText(it, polished) }
                 }
                 render(reviewOrIdle())
@@ -442,14 +447,24 @@ class TyvoInputMethodService : InputMethodService() {
      * Inserts newly dictated text, replacing the selection if there is one.
      * Adds a leading space when joining onto existing prose.
      */
-    private fun commitFresh(text: String) {
+    /**
+     * Inserts newly dictated text and starts a session on it.
+     *
+     * [transcript] is what was actually said, which the session keeps so
+     * clean-up can be undone. It differs from [text] when the inserted
+     * version has already been polished.
+     */
+    private fun commitFresh(text: String, transcript: String = text) {
         val ic = currentInputConnection ?: return
         val spaced = if (needsLeadingSpace(ic)) " $text" else text
         ic.beginBatchEdit()
         ic.commitText(spaced, 1)
         ic.endBatchEdit()
         committed = spaced
-        session.begin(spaced)
+        // Seed with the transcript, then promote the polished text, so
+        // "Undo clean-up" still has something to fall back to.
+        session.begin(transcript)
+        if (transcript != text) session.setPolished(spaced)
     }
 
     /**

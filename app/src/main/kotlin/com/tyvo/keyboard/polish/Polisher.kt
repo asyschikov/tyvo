@@ -53,6 +53,7 @@ class Polisher(
             }
         }
 
+
     /**
      * The model to use. A user's model override applies only to the provider
      * they actually selected -- a probe of a different provider must not
@@ -99,7 +100,7 @@ class Polisher(
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-        return text.trim().ifBlank { original }
+        return stripDashes(text.trim()).ifBlank { original }
     }
 
     // ---- Mistral --------------------------------------------------------
@@ -132,10 +133,29 @@ class Polisher(
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-        return text.trim().ifBlank { original }
+        return stripDashes(text.trim()).ifBlank { original }
     }
 
     companion object {
+
+    /**
+         * Replaces em and en dashes with punctuation someone would actually type.
+         *
+         * The prompts ask for this too, but a small model reaches for an em dash
+         * hard enough that asking is not sufficient -- and this is a rule that can
+         * be enforced exactly, so it should be. A spaced dash becomes a comma,
+         * which is what the dash was standing in for; an unspaced one becomes a
+         * full stop only when what follows looks like a new sentence, since
+         * "state-of-the-art" style compounds must survive.
+         */
+            fun stripDashes(text: String): String = text
+            .replace(Regex("\\s+[—–]\\s+"), ", ")
+            .replace(Regex("(?<=[a-z,;:])[—–](?=[A-Z])"), ". ")
+            .replace("—", ", ")
+            .replace("–", ", ")
+            .replace(Regex(",\\s*,"), ",")
+            .replace(Regex("\\s+,"), ",")
+
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
