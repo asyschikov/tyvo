@@ -19,20 +19,37 @@ keytool -genkeypair -v \
 It asks for a password and a name; the rest can be left blank. Keep it outside
 the repo — a stray `git add -f` is all it takes to publish a signing key.
 
-### 2. Store the passwords
+### 2. Put the key and its passwords in SecretSpec
 
-Secrets come from the environment, so they never sit in a file next to the
-code. Using [SecretSpec](https://secretspec.dev):
+`secretspec.toml` in the repo declares what is needed; the values live in your
+OS keychain. Once per machine:
 
 ```sh
-secretspec config global init      # once per machine, pick a provider
-secretspec set TYVO_KEYSTORE_PASSWORD
-secretspec set TYVO_KEY_PASSWORD
-secretspec set TYVO_KEYSTORE_PATH  # /Users/you/keys/tyvo-upload.jks
+secretspec config global init --provider keyring --profile default
 ```
 
-Anything that exports environment variables works just as well; the build only
-reads `System.getenv`.
+Then store the secrets. The keystore *file itself* goes in, not just a path to
+it — so the `.jks` never has to sit in the working tree:
+
+```sh
+secretspec set TYVO_KEYSTORE_PATH --from-file ~/keys/tyvo-upload.jks
+printf '%s' 'your-keystore-password' | secretspec set TYVO_KEYSTORE_PASSWORD --from-file -
+printf '%s' 'your-key-password'      | secretspec set TYVO_KEY_PASSWORD --from-file -
+printf '%s' 'tyvo'                   | secretspec set TYVO_KEY_ALIAS --from-file -
+```
+
+Use `printf '%s' | ... --from-file -`, not a here-string: `<<<` appends a
+newline and it gets stored as part of the password.
+
+At build time `as_path` decodes the keystore to a temp file and hands Gradle
+its path. The path is different on every run, so nothing can cache it.
+
+```sh
+secretspec check          # all four resolve?
+```
+
+Anything that exports environment variables works just as well — the build
+only reads `System.getenv`.
 
 ## Building a release
 
