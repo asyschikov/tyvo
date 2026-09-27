@@ -12,7 +12,7 @@ and the field gets:
 > I am going to cook lasagna.
 
 
-## No backend, and no subscription
+## No middlemen
 
 **There is no server.** Tyvo talks to your AI provider and nothing else — no
 account, no sign-up, no telemetry, no analytics, no crash reporting. Recordings
