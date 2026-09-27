@@ -123,6 +123,20 @@ class DictationSessionTest {
     }
 
     @Test
+    fun `a session seeded with polished text can still be unpolished`() {
+        // Only the polished text is inserted now, so the session is seeded
+        // with the transcript and then promoted. If that seeding were skipped
+        // the raw text would be lost and "Undo clean-up" would do nothing.
+        val s = DictationSession()
+        s.begin("um raw text")
+        s.setPolished("Raw text.")
+
+        assertTrue("there must be something to revert to", s.canUnpolish)
+        assertEquals("Raw text.", s.current)
+        assertEquals("um raw text", s.unpolish())
+    }
+
+    @Test
     fun `clear ends the session`() {
         val s = dictated("raw", "Polished.")
         s.setVariant("VARIANT", "formal")
