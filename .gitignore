@@ -12,3 +12,11 @@ local.defaults.properties
 release/
 *.keystore
 !debug.keystore
+
+# Signing material. The keystore lives outside the repo; these patterns are a
+# backstop in case one is ever copied in by accident.
+*.jks
+*.keystore
+!debug.keystore
+keystore.properties
+secretspec.toml
