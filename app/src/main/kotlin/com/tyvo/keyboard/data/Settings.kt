@@ -131,6 +131,17 @@ class Settings(context: Context) {
         get() = plain.getBoolean(KEY_KEEP_FAILED, false)
         set(v) = plain.edit().putBoolean(KEY_KEEP_FAILED, v).apply()
 
+    /**
+     * Whether the welcome flow has been completed.
+     *
+     * Drives which screen the app opens on: welcome the first time, history
+     * thereafter. Set only when the user finishes onboarding, so quitting
+     * halfway brings them back to it.
+     */
+    var hasOnboarded: Boolean
+        get() = plain.getBoolean(KEY_ONBOARDED, false)
+        set(v) = plain.edit().putBoolean(KEY_ONBOARDED, v).apply()
+
     /** Show a brief toast when a dictation fails. */
     var failureToasts: Boolean
         get() = plain.getBoolean(KEY_TOAST_FAIL, true)
@@ -189,6 +200,7 @@ class Settings(context: Context) {
         const val KEY_TOAST_FAIL = "toast_failures"
         const val KEY_KEEP_FAILED = "keep_failed_audio"
         const val KEY_CORRECTIONS = "enabled_corrections"
+        const val KEY_ONBOARDED = "has_onboarded"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
     }

@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.text.DateFormat
@@ -28,16 +29,16 @@ fun HistoryScreen(
     onExport: (Recording) -> Unit,
     onCopy: (Recording) -> Unit,
     onDelete: (Recording) -> Unit,
-    onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val attention = recordings.count { it.needsAttention }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("History") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Back") }
+                title = { Text("Tyvo") },
+                actions = {
+                    TextButton(onClick = onOpenSettings) { Text("Settings") }
                 },
             )
         },
@@ -47,11 +48,27 @@ fun HistoryScreen(
                 Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    "Nothing dictated yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // The empty state is the first thing most people see after
+                // onboarding, so it says what to do rather than just that
+                // there is nothing here.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(32.dp),
+                ) {
+                    Text(
+                        "Nothing dictated yet",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        "Open any app, tap a text field, switch to Tyvo with " +
+                            "the globe key and hold the mic. Everything you " +
+                            "dictate shows up here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             return@Scaffold
         }

@@ -1,0 +1,251 @@
+package com.tyvo.keyboard.onboarding
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings as AndroidSettings
+import android.view.inputmethod.InputMethodManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.tyvo.keyboard.data.Provider
+import com.tyvo.keyboard.data.Settings
+
+/**
+ * First run.
+ *
+ * Deliberately short: what the keyboard does, then only the steps without
+ * which it cannot work at all. Everything else -- models, corrections,
+ * language, retention -- has a sensible default and belongs in settings,
+ * where it can be found once the thing is actually working.
+ */
+@Composable
+fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
+    val ctx = LocalContext.current
+
+    var provider by remember { mutableStateOf(settings.provider) }
+    var apiKey by remember(provider) { mutableStateOf(settings.key(provider)) }
+    var showKey by remember { mutableStateOf(false) }
+
+    var micGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val micLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { micGranted = it }
+
+    // Re-read on every recomposition: the user leaves for system settings to
+    // enable the keyboard and comes back, and the row has to notice.
+    var imeEnabled by remember { mutableStateOf(isImeEnabled(ctx)) }
+    LaunchedEffect(Unit) { imeEnabled = isImeEnabled(ctx) }
+
+    val ready = micGranted && apiKey.isNotBlank()
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Tyvo", style = MaterialTheme.typography.displaySmall)
+        Text(
+            "Type with your voice.",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        Text(
+            "Speak into any text field and Tyvo writes what you meant, not " +
+                "what you said. It applies corrections you make out loud, drops " +
+                "the ums, and punctuates.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        ExampleCard()
+
+        Text(
+            "Then you can reshape it without retyping: shorter, more formal, " +
+                "as a list, as an email — or tell it what you want in your own " +
+                "words. Every change is one tap to undo.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        HorizontalDivider()
+
+        Text("To get started", style = MaterialTheme.typography.titleMedium)
+
+        // --- 1. key ------------------------------------------------------
+        StepCard(number = 1, title = "Add an API key", done = apiKey.isNotBlank()) {
+            Text(
+                "Tyvo uses your own account, so you pay the provider directly " +
+                    "and nothing goes through us. One key covers both " +
+                    "transcription and clean-up.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Provider.entries.forEach { p ->
+                    FilterChip(
+                        selected = provider == p,
+                        onClick = { provider = p; settings.provider = p },
+                        label = { Text(p.label) },
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it; settings.setKey(provider, it) },
+                label = { Text("${provider.label} API key") },
+                singleLine = true,
+                visualTransformation =
+                    if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                textStyle = MaterialTheme.typography.bodyMedium
+                    .copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = showKey, onCheckedChange = { showKey = it })
+                Text("Show key", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        // --- 2. microphone ------------------------------------------------
+        StepCard(number = 2, title = "Allow the microphone", done = micGranted) {
+            Text(
+                "Audio is sent to ${provider.label} to be transcribed and is " +
+                    "never stored anywhere else.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!micGranted) {
+                Button(onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }) {
+                    Text("Allow microphone")
+                }
+            }
+        }
+
+        // --- 3. enable the keyboard ---------------------------------------
+        StepCard(number = 3, title = "Turn Tyvo on", done = imeEnabled) {
+            Text(
+                "Android needs you to enable Tyvo in its keyboard settings, " +
+                    "then pick it with the globe key while typing.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    ctx.startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
+                }) { Text(if (imeEnabled) "Keyboard settings" else "Enable Tyvo") }
+                if (imeEnabled) {
+                    OutlinedButton(onClick = {
+                        (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                            .showInputMethodPicker()
+                    }) { Text("Switch to Tyvo") }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Button(
+            onClick = { settings.hasOnboarded = true; onDone() },
+            enabled = ready,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (ready) "Start dictating" else "Add a key to continue") }
+
+        // An escape hatch, because someone may want to look around before
+        // committing a key -- but it does not mark onboarding complete.
+        TextButton(
+            onClick = onDone,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        ) { Text("Skip for now") }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun ExampleCard() {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "You say",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "\"um so I am going to cook pasta sorry no lasagna\"",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Tyvo writes",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "I am going to cook lasagna.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepCard(
+    number: Int,
+    title: String,
+    done: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (done) "✓" else "$number",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (done) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(28.dp),
+                )
+                Text(title, style = MaterialTheme.typography.titleSmall)
+            }
+            content()
+        }
+    }
+}
+
+private fun isImeEnabled(ctx: Context): Boolean {
+    val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    return imm.enabledInputMethodList.any { it.packageName == ctx.packageName }
+}

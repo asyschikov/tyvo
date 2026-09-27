@@ -136,6 +136,19 @@ One known limit: the store is not safe against the app and the keyboard
 writing at the same instant, since its lock is per-process. Two simultaneous
 writes could lose one update — never a WAV.
 
+## The app
+
+Three screens:
+
+- **Welcome** — shown once, on first run. What the keyboard does, then only
+  the three things it cannot work without: an API key, the microphone, and
+  enabling Tyvo in Android's keyboard settings. Models, corrections, language
+  and retention all have sensible defaults and stay out of the way until
+  someone goes looking.
+- **History** — home from then on. Every dictation, unfinished ones pinned to
+  the top.
+- **Settings** — a tap away from History, back returns.
+
 ## Setup
 
 1. Install the APK and open **Tyvo**.

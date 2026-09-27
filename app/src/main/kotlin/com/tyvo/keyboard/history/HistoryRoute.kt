@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 fun HistoryRoute(
     store: RecordingStore,
     settings: Settings,
-    onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -99,7 +99,7 @@ fun HistoryRoute(
             store.delete(rec.id)
             refresh()
         },
-        onBack = onBack,
+        onOpenSettings = onOpenSettings,
     )
 }
 

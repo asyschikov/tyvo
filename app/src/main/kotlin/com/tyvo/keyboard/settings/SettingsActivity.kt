@@ -31,7 +31,9 @@ import com.tyvo.keyboard.data.Languages
 import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
+import androidx.activity.compose.BackHandler
 import com.tyvo.keyboard.history.HistoryRoute
+import com.tyvo.keyboard.onboarding.WelcomeScreen
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
@@ -41,6 +43,9 @@ import kotlinx.coroutines.launch
 import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
+
+/** Which of the app's screens is showing. */
+private enum class Screen { WELCOME, HISTORY, SETTINGS }
 
 class SettingsActivity : ComponentActivity() {
 
@@ -58,37 +63,47 @@ class SettingsActivity : ComponentActivity() {
         store = RecordingStore(this)
         Maintenance.runInBackground(store, settings)
 
-        val startOnHistory = intent?.action == ACTION_SHOW_HISTORY
-
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    var showHistory by remember { mutableStateOf(startOnHistory) }
-                    if (showHistory) {
-                        HistoryRoute(
+                    // History is home once the user is set up; the welcome
+                    // flow only stands in front of it the first time.
+                    var screen by remember {
+                        // A notification tap means there is a recording
+                        // waiting, so the welcome flow would be in the way
+                        // even if onboarding was skipped earlier.
+                        val fromNotification = intent?.action == ACTION_SHOW_HISTORY
+                        mutableStateOf(
+                            if (settings.hasOnboarded || fromNotification) Screen.HISTORY
+                            else Screen.WELCOME
+                        )
+                    }
+
+                    when (screen) {
+                        Screen.WELCOME -> WelcomeScreen(
+                            settings = settings,
+                            onDone = { screen = Screen.HISTORY },
+                        )
+
+                        Screen.HISTORY -> HistoryRoute(
                             store = store,
                             settings = settings,
-                            onBack = { showHistory = false },
+                            onOpenSettings = { screen = Screen.SETTINGS },
                         )
-                    } else {
-                        SettingsScreen(
+
+                        Screen.SETTINGS -> SettingsScreen(
                             settings = settings,
                             activity = this,
-                            store = store,
-                            onOpenHistory = { showHistory = true },
+                            onBack = { screen = Screen.HISTORY },
                         )
+                    }
+
+                    BackHandler(enabled = screen == Screen.SETTINGS) {
+                        screen = Screen.HISTORY
                     }
                 }
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        // Recreate so a notification tap lands on History even when the
-        // activity was already open on Settings.
-        if (intent.action == ACTION_SHOW_HISTORY) recreate()
     }
 }
 
@@ -97,8 +112,7 @@ class SettingsActivity : ComponentActivity() {
 private fun SettingsScreen(
     settings: Settings,
     activity: ComponentActivity,
-    store: RecordingStore,
-    onOpenHistory: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val ctx = activity as Context
 
@@ -157,12 +171,10 @@ private fun SettingsScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("Tyvo", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Voice keyboard with LLM clean-up.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("‹ Back") }
+        }
+        Text("Settings", style = MaterialTheme.typography.headlineMedium)
 
         readiness.problem?.let { problem ->
             Card(
@@ -215,75 +227,6 @@ private fun SettingsScreen(
                     (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                         .showInputMethodPicker()
                 },
-            )
-        }
-
-        // ---- history -----------------------------------------------------
-        val pending = remember { store.needingAttention().size }
-        SectionCard("Recordings") {
-            Text(
-                "Every dictation is saved here. Anything that could not be " +
-                    "transcribed keeps its audio so it can be retried.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (pending > 0) {
-                    Text(
-                        if (pending == 1) "1 needs attention" else "$pending need attention",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                Button(onClick = onOpenHistory) { Text("Open history") }
-            }
-
-            HorizontalDivider()
-
-            val audioMb = remember { store.audioBytes() / (1024.0 * 1024.0) }
-            Text(
-                "Transcripts are kept indefinitely. Audio is deleted as soon " +
-                    "as it is transcribed, and otherwise after 24 hours." +
-                    if (audioMb >= 0.1) "  Currently %.1f MB.".format(audioMb) else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ToggleRow(
-                checked = keepFailed,
-                onChange = { keepFailed = it; settings.keepFailedAudio = it },
-                title = "Keep failed recordings indefinitely",
-                subtitle = "For a failed dictation the audio is the only copy " +
-                    "of what you said, so it is never deleted on a timer.",
-            )
-
-            HorizontalDivider()
-
-            Text(
-                "When a dictation cannot be transcribed",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            ToggleRow(
-                checked = toastOnFail,
-                onChange = { toastOnFail = it; settings.failureToasts = it },
-                title = "Show a toast",
-                subtitle = "A brief message on screen, straight away.",
-            )
-            ToggleRow(
-                checked = notifyOnFail,
-                onChange = {
-                    notifyOnFail = it
-                    settings.failureNotifications = it
-                    // Clear anything already in the shade, rather than
-                    // leaving a notification the setting now disowns.
-                    if (!it) Notifications.clear(ctx)
-                },
-                title = "Post a notification",
-                subtitle = "Stays in the shade until you deal with it. " +
-                    "The recording is kept either way.",
             )
         }
 
