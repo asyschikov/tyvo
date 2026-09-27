@@ -22,7 +22,7 @@ to this project, because there isn't any.
 
 Tired of subscriptions and rug full "fremiums"? Every app in this space wants a
 10 coins a month whether you use it twice or two hundred times, routing your
-audio through their servers to justify the bill. **Bring your own key and pay
+audio through their servers to justify the bill. Tyvo is free, **bring your own key and pay
 the provider directly, per second of audio.** A heavy day costs cents; a quiet
 week costs nothing.
 
@@ -331,7 +331,17 @@ Verified working on a Pixel 10 (Android 17):
 - Live HTTPS calls to Mistral; errors surface as readable text
 - WAV format accepted by the transcription endpoint (HTTP 200)
 - Clean-up prompt: 8/8 on a tricky-transcript suite against the real API
-- 22 unit tests
+- 85 unit tests
 
 Not yet verified end to end: speaking into the mic and getting polished text
-back, which needs a working transcription tier plus a human voice.
+back. Every part of that path is verified on its own; nobody has yet held the
+mic and talked.
+
+## Licence
+
+GPLv3 — see [LICENSE](LICENSE). Use it, change it, share it; if you distribute
+a modified version, it has to stay open under the same terms.
+
+**Alternative licences are available on request.** If GPLv3 does not suit what
+you want to build, get in touch at asyschikov+tyvo@gmail.com and we can sort
+something out.
