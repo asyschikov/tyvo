@@ -109,6 +109,32 @@ class Settings(context: Context) {
         get() = plain.getBoolean(KEY_POLISH_ON, true)
         set(v) = plain.edit().putBoolean(KEY_POLISH_ON, v).apply()
 
+    /**
+     * Post a notification when a dictation could not be transcribed.
+     *
+     * On by default: the recording is kept either way, but without the
+     * notification a failure that happened while typing in another app is
+     * easy to walk away from and forget.
+     */
+    var failureNotifications: Boolean
+        get() = plain.getBoolean(KEY_NOTIFY_FAIL, true)
+        set(v) = plain.edit().putBoolean(KEY_NOTIFY_FAIL, v).apply()
+
+    /**
+     * Keep audio for failed dictations past the usual 24 hours.
+     *
+     * Successful recordings still expire on schedule: their text is the copy
+     * that matters. For a failure the audio is the only copy there is.
+     */
+    var keepFailedAudio: Boolean
+        get() = plain.getBoolean(KEY_KEEP_FAILED, false)
+        set(v) = plain.edit().putBoolean(KEY_KEEP_FAILED, v).apply()
+
+    /** Show a brief toast when a dictation fails. */
+    var failureToasts: Boolean
+        get() = plain.getBoolean(KEY_TOAST_FAIL, true)
+        set(v) = plain.edit().putBoolean(KEY_TOAST_FAIL, v).apply()
+
     /** Spoken language hint (ISO-639-1), blank = auto-detect. */
     var languageHint: String
         get() = plain.getString(KEY_LANG, "").orEmpty()
@@ -133,6 +159,9 @@ class Settings(context: Context) {
         const val KEY_MISTRAL = "mistral_key"
         const val KEY_AUTOPOLISH = "auto_polish"
         const val KEY_POLISH_ON = "polish_enabled"
+        const val KEY_NOTIFY_FAIL = "notify_failures"
+        const val KEY_TOAST_FAIL = "toast_failures"
+        const val KEY_KEEP_FAILED = "keep_failed_audio"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
     }

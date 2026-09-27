@@ -109,8 +109,32 @@ When transcription fails:
 the top. Transcribed entries keep their text and can be copied; failed and
 pending ones keep their WAV and offer Retry and Save audio.
 
-Successful recordings discard their audio once transcribed — the text is what
-you wanted, and 16 kHz mono runs about 1.9 MB per minute.
+Successful recordings discard their audio the moment they are transcribed —
+the text is what you wanted, and 16 kHz mono runs about 1.9 MB per minute.
+Anything else loses its audio after 24 hours, swept on app or keyboard start.
+**Transcripts are never deleted automatically**; only the audio expires, so an
+old entry stops being retryable but never stops being readable.
+
+Settings has *Keep failed recordings indefinitely* for the case where the
+audio is the only copy of what you said. It exempts failures only — successful
+recordings still expire on schedule.
+
+### How durable is it?
+
+The audio files are the irreplaceable part, and they are written once and
+never mutated. The index is a single JSON file, rewritten in full, `fsync`ed,
+then renamed over the old one — renaming is atomic for readers, but without
+the sync a power loss can leave the renamed file full of zeroes. There is
+deliberately no in-place fallback: a failed write that leaves the previous
+index intact beats one that truncates it.
+
+The index is also *disposable*. On start-up the store scans for WAVs it has
+lost track of and re-adopts them as pending, so even deleting the index
+outright costs you metadata rather than recordings.
+
+One known limit: the store is not safe against the app and the keyboard
+writing at the same instant, since its lock is per-process. Two simultaneous
+writes could lose one update — never a WAV.
 
 ## Setup
 

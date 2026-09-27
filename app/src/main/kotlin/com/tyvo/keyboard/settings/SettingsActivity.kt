@@ -31,6 +31,8 @@ import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
 import com.tyvo.keyboard.history.HistoryRoute
+import com.tyvo.keyboard.history.Maintenance
+import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
@@ -52,6 +54,7 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         settings = Settings(this)
         store = RecordingStore(this)
+        Maintenance.runInBackground(store, settings)
 
         val startOnHistory = intent?.action == ACTION_SHOW_HISTORY
 
@@ -109,6 +112,9 @@ private fun SettingsScreen(
     var lang by remember { mutableStateOf(settings.languageHint) }
     var vocab by remember { mutableStateOf(settings.vocabulary) }
     var showKey by remember { mutableStateOf(false) }
+    var notifyOnFail by remember { mutableStateOf(settings.failureNotifications) }
+    var toastOnFail by remember { mutableStateOf(settings.failureToasts) }
+    var keepFailed by remember { mutableStateOf(settings.keepFailedAudio) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -178,7 +184,7 @@ private fun SettingsScreen(
                 button = "Grant",
                 onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
             )
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (android.os.Build.VERSION.SDK_INT >= 33 && notifyOnFail) {
                 SetupRow(
                     done = notifyGranted,
                     label = "Alerts for failed dictations",
@@ -231,6 +237,50 @@ private fun SettingsScreen(
                 Spacer(Modifier.weight(1f))
                 Button(onClick = onOpenHistory) { Text("Open history") }
             }
+
+            HorizontalDivider()
+
+            val audioMb = remember { store.audioBytes() / (1024.0 * 1024.0) }
+            Text(
+                "Transcripts are kept indefinitely. Audio is deleted as soon " +
+                    "as it is transcribed, and otherwise after 24 hours." +
+                    if (audioMb >= 0.1) "  Currently %.1f MB.".format(audioMb) else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ToggleRow(
+                checked = keepFailed,
+                onChange = { keepFailed = it; settings.keepFailedAudio = it },
+                title = "Keep failed recordings indefinitely",
+                subtitle = "For a failed dictation the audio is the only copy " +
+                    "of what you said, so it is never deleted on a timer.",
+            )
+
+            HorizontalDivider()
+
+            Text(
+                "When a dictation cannot be transcribed",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            ToggleRow(
+                checked = toastOnFail,
+                onChange = { toastOnFail = it; settings.failureToasts = it },
+                title = "Show a toast",
+                subtitle = "A brief message on screen, straight away.",
+            )
+            ToggleRow(
+                checked = notifyOnFail,
+                onChange = {
+                    notifyOnFail = it
+                    settings.failureNotifications = it
+                    // Clear anything already in the shade, rather than
+                    // leaving a notification the setting now disowns.
+                    if (!it) Notifications.clear(ctx)
+                },
+                title = "Post a notification",
+                subtitle = "Stays in the shade until you deal with it. " +
+                    "The recording is kept either way.",
+            )
         }
 
         // ---- provider ----------------------------------------------------
@@ -499,6 +549,30 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             content()
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    title: String,
+    subtitle: String,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Switch(checked = checked, onCheckedChange = onChange)
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

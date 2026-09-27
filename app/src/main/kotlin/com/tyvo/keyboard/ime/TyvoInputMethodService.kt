@@ -12,11 +12,13 @@ import android.os.VibratorManager
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import android.view.inputmethod.InputConnection
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
 import com.tyvo.keyboard.data.Settings
+import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.net.TyvoException
@@ -89,6 +91,7 @@ class TyvoInputMethodService : InputMethodService() {
         transcriber = Transcriber(settings)
         polisher = Polisher(settings)
         store = RecordingStore(this)
+        Maintenance.runInBackground(store, settings)
     }
 
     override fun onCreateInputView(): View {
@@ -227,7 +230,7 @@ class TyvoInputMethodService : InputMethodService() {
                     // audio so the user can check for themselves.
                     recordingId?.let { store.markFailed(it, "No speech detected.") }
                     lastFailedId = recordingId
-                    notifyFailure()
+                    notifyFailure("No speech detected.")
                     render(UiState.Idle("Nothing heard. Saved to Tyvo.", canRetry = true))
                     return@launch
                 }
@@ -275,7 +278,7 @@ class TyvoInputMethodService : InputMethodService() {
     private fun failRecording(recordingId: String?, message: String) {
         recordingId?.let { store.markFailed(it, message) }
         lastFailedId = recordingId
-        notifyFailure()
+        if (recordingId != null) notifyFailure(message)
         render(
             UiState.Idle(
                 lastError = if (recordingId != null) "$message Saved - tap Retry." else message,
@@ -296,8 +299,23 @@ class TyvoInputMethodService : InputMethodService() {
         transcribeRecording(id, audio)
     }
 
-    private fun notifyFailure() {
-        Notifications.transcriptionFailed(this, store.needingAttention().size)
+    /**
+     * Tells the user a dictation was saved rather than lost.
+     *
+     * Two channels because they cover different moments: the toast is seen
+     * now, while they are still looking at the field, and the notification is
+     * found later, once they have wandered off. Both are optional, and the
+     * keyboard's own status line carries the message regardless.
+     */
+    private fun notifyFailure(message: String) {
+        if (settings.failureToasts) {
+            runCatching {
+                Toast.makeText(this, "$message Saved to Tyvo.", Toast.LENGTH_LONG).show()
+            }
+        }
+        if (settings.failureNotifications) {
+            Notifications.transcriptionFailed(this, store.needingAttention().size)
+        }
     }
 
     private fun runAction(action: QuickAction) =

@@ -151,6 +151,116 @@ class RecordingStoreTest {
         assertFalse(audio.exists())
     }
 
+    // ---- recovery --------------------------------------------------------
+
+    @Test
+    fun `audio orphaned by a lost index is recovered`() {
+        val dir = tmp.newFolder()
+        val first = RecordingStore(dir)
+        first.addPending(wav(), 1000)
+
+        // Simulate the index being corrupted or wiped while the audio remains.
+        File(dir, "recordings/index.json").delete()
+
+        val second = RecordingStore(dir)
+        assertTrue("index is gone", second.all().isEmpty())
+        assertEquals(1, second.recoverOrphanedAudio())
+
+        val recovered = second.all().single()
+        assertEquals(Recording.Status.PENDING, recovered.status)
+        assertNotNull("the recording must be retryable again", second.audioFor(recovered))
+    }
+
+    @Test
+    fun `recovery derives a duration from the wav header`() {
+        val dir = tmp.newFolder()
+        val store = RecordingStore(dir)
+        // 44-byte header + one second of 16 kHz mono 16-bit audio.
+        store.addPending(wav(bytes = 44 + 16_000 * 2), 0)
+        File(dir, "recordings/index.json").delete()
+
+        val reopened = RecordingStore(dir)
+        reopened.recoverOrphanedAudio()
+        assertEquals(1000, reopened.all().single().durationMs)
+    }
+
+    @Test
+    fun `recovery leaves known recordings alone`() {
+        val rec = store.addPending(wav(), 1000)
+        assertEquals("nothing is orphaned", 0, store.recoverOrphanedAudio())
+        assertEquals(1, store.all().size)
+        assertEquals(rec.id, store.all().single().id)
+    }
+
+    @Test
+    fun `recovery does not resurrect audio that was correctly deleted`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markDone(rec.id, "transcribed")
+        assertEquals(0, store.recoverOrphanedAudio())
+        assertEquals(1, store.all().size)
+    }
+
+    // ---- expiry ----------------------------------------------------------
+
+    private val DAY = 24 * 60 * 60 * 1000L
+
+    @Test
+    fun `audio older than a day is expired but its text is kept`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markDone(rec.id, "spoken words")
+        // markDone already frees the audio, so re-add one to age out.
+        val stale = store.addPending(wav(), 1000)
+        store.markFailed(stale.id, "No connection.")
+
+        val freed = store.expireAudio(now = System.currentTimeMillis() + DAY + 1000)
+        assertEquals(1, freed)
+
+        val reloaded = store.get(stale.id)!!
+        assertNull("audio should be gone", reloaded.audioFile)
+        assertEquals("the row must survive", Recording.Status.FAILED, reloaded.status)
+        assertEquals("transcripts are never expired", "spoken words", store.get(rec.id)!!.text)
+    }
+
+    @Test
+    fun `expiry explains why a recording can no longer be retried`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markFailed(rec.id, "No connection.")
+        store.expireAudio(now = System.currentTimeMillis() + DAY + 1000)
+        assertTrue(store.get(rec.id)!!.error!!.contains("Audio expired"))
+    }
+
+    @Test
+    fun `recent audio is left alone`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markFailed(rec.id, "No connection.")
+        assertEquals(0, store.expireAudio())
+        assertNotNull(store.audioFor(store.get(rec.id)!!))
+    }
+
+    @Test
+    fun `keepFailed exempts failures but not successes`() {
+        val failed = store.addPending(wav(), 1000)
+        store.markFailed(failed.id, "No connection.")
+        val pendingRec = store.addPending(wav(), 1000)
+
+        val later = System.currentTimeMillis() + DAY + 1000
+        assertEquals("neither should be touched", 0, store.expireAudio(keepFailed = true, now = later))
+        assertNotNull(store.audioFor(store.get(failed.id)!!))
+        assertNotNull(store.audioFor(store.get(pendingRec.id)!!))
+
+        // Without the exemption they expire on schedule.
+        assertEquals(2, store.expireAudio(keepFailed = false, now = later))
+    }
+
+    @Test
+    fun `expiry is idempotent`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markFailed(rec.id, "No connection.")
+        val later = System.currentTimeMillis() + DAY + 1000
+        assertEquals(1, store.expireAudio(now = later))
+        assertEquals("nothing left to free", 0, store.expireAudio(now = later))
+    }
+
     @Test
     fun `updateText revises a transcript without resurrecting audio`() {
         val rec = store.addPending(wav(), 1000)

@@ -4,6 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
 /**
@@ -108,6 +109,46 @@ class RecordingStore(baseDir: File) {
     fun get(id: String): Recording? = read().firstOrNull { it.id == id }
 
     /**
+     * Re-adopts audio files the index has lost track of.
+     *
+     * This is what makes the index genuinely disposable: even if it is
+     * corrupted or deleted outright, the recordings themselves reappear as
+     * PENDING and can still be retried. Without it a damaged index would
+     * leave WAVs on disk that the app could never show.
+     *
+     * Returns how many were recovered.
+     */
+    fun recoverOrphanedAudio(): Int = synchronized(lock) {
+        val known = read()
+        val referenced = known.mapNotNull { it.audioFile }.toSet()
+        val orphans = audioDir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".wav") && it.name !in referenced }
+            ?: return@synchronized 0
+        if (orphans.isEmpty()) return@synchronized 0
+
+        val recovered = orphans.map { file ->
+            Recording(
+                id = UUID.randomUUID().toString(),
+                createdAt = file.lastModified(),
+                status = Recording.Status.PENDING,
+                audioFile = file.name,
+                durationMs = durationOfWav(file),
+                error = "Recovered after an interrupted session.",
+            )
+        }
+        write(known + recovered)
+        recovered.size
+    }
+
+    /** Duration from the WAV header, for a recovered file with no metadata. */
+    private fun durationOfWav(file: File): Long {
+        val bytes = file.length() - 44
+        if (bytes <= 0) return 0
+        // 16 kHz, mono, 16-bit -- what the recorder always writes.
+        return bytes * 1000 / (16_000 * 2)
+    }
+
+    /**
      * Everything, newest first, with unfinished recordings pinned to the top
      * so work that still needs attention cannot scroll out of sight.
      */
@@ -118,9 +159,54 @@ class RecordingStore(baseDir: File) {
 
     fun needingAttention(): List<Recording> = all().filter { it.needsAttention }
 
+    /**
+     * Expires audio older than [maxAgeMs], keeping every transcript.
+     *
+     * Only the WAV is removed -- the row and its text stay forever, because
+     * text costs almost nothing and is the part the user came for. An expired
+     * recording simply stops being retryable.
+     *
+     * [keepFailed] exempts failed and pending recordings, which is the case
+     * where the audio is the only copy of what was said.
+     *
+     * Returns how many files were freed.
+     */
+    fun expireAudio(
+        maxAgeMs: Long = DEFAULT_MAX_AUDIO_AGE_MS,
+        keepFailed: Boolean = false,
+        now: Long = System.currentTimeMillis(),
+    ): Int = synchronized(lock) {
+        val all = read()
+        var freed = 0
+        val updated = all.map { rec ->
+            val expired = rec.audioFile != null &&
+                now - rec.createdAt > maxAgeMs &&
+                !(keepFailed && rec.needsAttention)
+            if (!expired) rec else {
+                File(audioDir, rec.audioFile!!).delete()
+                freed++
+                rec.copy(
+                    audioFile = null,
+                    // Say why it can no longer be retried, rather than
+                    // silently dropping the button.
+                    error = if (rec.needsAttention) {
+                        "${rec.error ?: "Failed."} Audio expired."
+                    } else rec.error,
+                )
+            }
+        }
+        if (freed > 0) write(updated)
+        freed
+    }
+
     /** Bytes held by retained audio, for showing storage use. */
     fun audioBytes(): Long =
         audioDir.listFiles()?.sumOf { it.length() } ?: 0L
+
+    companion object {
+        /** Audio older than this is dropped; transcripts are never expired. */
+        const val DEFAULT_MAX_AUDIO_AGE_MS = 24 * 60 * 60 * 1000L
+    }
 
     // ---- persistence -----------------------------------------------------
 
@@ -138,14 +224,32 @@ class RecordingStore(baseDir: File) {
         }
     }
 
+    /**
+     * Rewrites the index atomically and durably.
+     *
+     * The temp file is flushed to disk with fsync *before* the rename:
+     * renaming is atomic for readers, but without the sync a power loss can
+     * leave the renamed file full of zeroes, which is a documented ext4
+     * behaviour rather than a theoretical one.
+     *
+     * There is deliberately no fallback that writes the index in place. That
+     * is exactly the non-atomic operation the temp file exists to avoid, and
+     * a failed write that leaves the previous index intact is much better
+     * than one that truncates it.
+     */
     private fun write(items: List<Recording>) {
         val arr = JSONArray()
         items.forEach { arr.put(toJson(it)) }
         val tmp = File(root, "index.json.tmp")
         try {
-            tmp.writeText(arr.toString())
+            FileOutputStream(tmp).use { out ->
+                out.write(arr.toString().toByteArray())
+                out.flush()
+                out.fd.sync()
+            }
             if (!tmp.renameTo(index)) {
-                index.writeText(arr.toString())
+                // Leave the old index in place; the audio is still on disk and
+                // recovery will pick it up on the next load.
                 tmp.delete()
             }
         } catch (e: Exception) {
