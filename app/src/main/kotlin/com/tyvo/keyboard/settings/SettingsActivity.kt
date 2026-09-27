@@ -440,10 +440,11 @@ private fun SettingsScreen(
                     corrections.size > Correction.defaults.size
                 if (heavy) {
                     Text(
-                        "More corrections means a longer instruction list, and " +
-                            "smaller models start dropping the earlier ones. If " +
-                            "self-corrections stop being applied, switch off the " +
-                            "extras or pick a larger model.",
+                        "Each extra correction lengthens the instruction list, " +
+                            "and smaller models start dropping the earlier ones — " +
+                            "measured on Ministral 3B, spoken corrections go from " +
+                            "always applied to rarely. If self-corrections stop " +
+                            "working, switch these off or pick a larger model.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

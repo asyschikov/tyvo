@@ -98,6 +98,32 @@ enum class Correction(
         """.trimIndent(),
     ),
 
+    LISTS(
+        id = "lists",
+        label = "Numbered lists",
+        summary = "\"first... second... next...\" becomes a numbered list",
+        defaultOn = false,
+        instruction = """
+            NUMBERED LISTS. When the speaker enumerates items with ordinal or
+            sequencing words -- "first", "second", "third", "next", "then",
+            "finally", "lastly", "after that" -- rewrite the run as a numbered
+            list, one item per line, each starting "1. ", "2. " and so on.
+            Drop the spoken marker itself, since the number replaces it, and
+            keep each item's own words exactly. The shape is:
+
+              1. <the speaker's first item>
+              2. <the speaker's second item>
+
+            A list needs at least three items with real content of their own.
+            Fewer than three, and it stays prose -- a one-item numbered list is
+            always wrong. A sentence that merely begins "first", or a
+            "then" that narrates a sequence of events, is ordinary prose and
+            must be left alone. If there are sequencing words but no items to
+            go with them, return the transcript as it was -- never invent
+            items, and never describe what you are doing.
+        """.trimIndent(),
+    ),
+
     NUMBERS(
         id = "numbers",
         label = "Numbers and dates",

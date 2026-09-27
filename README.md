@@ -157,16 +157,19 @@ Clean-up is a list of things the model is allowed to do, each switchable:
 | Spoken punctuation | on | "question mark" becomes `?` |
 | Light grammar | on | Agreement and obvious transcription slips |
 | Paragraph breaks | off | Splits long dictation where the topic changes |
+| Numbered lists | off | "first… second… next…" becomes a numbered list |
 | Numbers and dates | off | "twenty five euros" → "EUR 25" |
 
 Disabled ones are left out of the prompt entirely rather than negated — a
 prompt full of "do not do X" reads to a small model as a list of things worth
 considering.
 
-**The two optional ones cost accuracy.** Measured on `ministral-3b`: with the
-five defaults the spoken-correction case passes 3/3; with all seven it drops
-to 1/3. Longer instruction lists crowd out the earlier items. Settings warns
-you when you enable them.
+**The optional ones cost accuracy.** Measured on `ministral-3b`: the
+spoken-correction case passes 3/3 with the five defaults, 1/3 with seven
+corrections, and 0/3 with all eight. Longer instruction lists crowd out the
+earlier items, so the self-correction rule sits above the list rather than in
+it, and settings warns you when you switch extras on. On a larger model the
+ceiling is higher.
 
 ## Transcription accuracy
 

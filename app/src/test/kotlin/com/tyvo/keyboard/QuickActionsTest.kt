@@ -5,6 +5,7 @@ import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Prompts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -159,6 +160,30 @@ class QuickActionsTest {
             p.contains("Return the transcript unchanged"),
         )
         assertFalse(p.contains("1."))
+    }
+
+    @Test
+    fun `numbered lists is available and off by default`() {
+        // Measured on ministral-3b: the spoken-correction case passes 3/3
+        // with the five defaults and 0/3 with all eight, so every optional
+        // correction has to earn being switched on.
+        assertNotNull(Correction.byId("lists"))
+        assertFalse(
+            "extra corrections crowd out the headline one, so lists stays off",
+            Correction.LISTS.defaultOn,
+        )
+    }
+
+    @Test
+    fun `the lists instruction carries no echoable example items`() {
+        // A worked example here got copied into the output verbatim, so the
+        // shape is shown with placeholders instead.
+        val i = Correction.LISTS.instruction
+        listOf("plumber", "van", "email Tom").forEach {
+            assertFalse("\"$it\" can be echoed into a user's text", i.contains(it))
+        }
+        assertTrue("the required shape should still be shown", i.contains("1. <"))
+        assertTrue("a floor prevents one-item lists", i.contains("three items"))
     }
 
     @Test
