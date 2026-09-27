@@ -171,15 +171,23 @@ earlier items, so the self-correction rule sits above the list rather than in
 it, and settings warns you when you switch extras on. On a larger model the
 ceiling is higher.
 
-## Transcription accuracy
+## Language
 
-- **Vocabulary** — names and jargon the transcriber keeps mangling: product
-  names, colleagues, technical terms. Sent as a biasing prompt (OpenAI) or
-  `context_bias` terms (Mistral, max 100). A nudge, not a dictionary.
-- **Language hint** — an ISO code, shown only on OpenAI, where it is
-  documented to "improve accuracy and latency".
+One slot, chosen from a searchable list of 45 languages (matching on code,
+English name or endonym). Blank means auto-detect, which is the right setting
+if you switch languages.
 
-### Why there is no language hint on Mistral
+It is one slot rather than a list because the transcription APIs accept
+exactly one code — a list would only ever send its first entry, which is a
+setting that lies about what it does.
+
+## Vocabulary
+
+Names and jargon the transcriber keeps mangling: product names, colleagues,
+technical terms. Sent as a biasing prompt (OpenAI) or `context_bias` terms
+(Mistral, max 100). A nudge, not a dictionary.
+
+### How much the language hint actually helps
 
 Mistral documents `language` as an accuracy hint layered on top of
 auto-detection, not a constraint — and measured against the live API it has no
@@ -199,10 +207,20 @@ the *response* is always `null`, even for clear speech with no
 `timestamp_granularities` set — undocumented, and it means there is no
 detection result to act on either.
 
-Auto-detect was correct in every case tested, down to single words, so Tyvo
-omits the parameter on Mistral rather than implying a setting that does
-nothing. Passing a list of preferred languages is not possible on either
-provider.
+Mistral's docs describe it as an accuracy hint layered on top of
+auto-detection rather than a constraint, so this is documented behaviour
+rather than a fault. OpenAI's claim is stronger — "improve accuracy and
+latency", where the latency gain implies detection is genuinely skipped.
+
+Tyvo sends it to both anyway: it costs one form field, and it will take effect
+on Mistral if that ever changes.
+
+There is also no way to recover from a mis-detection after the fact. The
+response's `language` field is always `null` (even with no
+`timestamp_granularities`, the one documented incompatibility), so there is no
+detection result to branch on — and re-transcribing with a forced hint
+provably returns identical text. A "detect the language during clean-up and
+retry" path would have nothing to trigger it and nothing to fix.
 
 ## Build
 

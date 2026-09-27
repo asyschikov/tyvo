@@ -155,7 +155,13 @@ class Settings(context: Context) {
         enabledCorrections = if (on) enabledCorrections + c.id else enabledCorrections - c.id
     }
 
-    /** Spoken language hint (ISO-639-1), blank = auto-detect. */
+    /**
+     * The language sent to the transcriber, or blank to let it detect.
+     *
+     * One slot rather than a list because the transcription APIs accept
+     * exactly one code. Offering several would only ever send the first,
+     * which is a setting that lies about what it does.
+     */
     var languageHint: String
         get() = plain.getString(KEY_LANG, "").orEmpty()
         set(v) = plain.edit().putString(KEY_LANG, v.trim()).apply()

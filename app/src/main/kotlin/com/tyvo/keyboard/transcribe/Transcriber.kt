@@ -78,10 +78,12 @@ class Transcriber(private val settings: Settings) {
             )
             .addFormDataPart("model", model)
             .apply {
-                // No language part: Voxtral validates the code and then
-                // ignores it. Verified against the live API -- Russian audio
-                // sent with language=en, and with language=bg, came back
-                // byte-identical to auto-detect.
+                // Sent even though Voxtral currently ignores it: measured
+                // against the live API, a wrong code changes nothing. It
+                // costs one form field, and if Mistral ever honours it the
+                // app is already passing it.
+                settings.languageHint.takeIf { it.isNotBlank() }
+                    ?.let { addFormDataPart("language", it) }
                 // Mistral takes bias terms as repeated fields rather than a prompt.
                 settings.vocabularyTerms().take(100).forEach {
                     addFormDataPart("context_bias", it)

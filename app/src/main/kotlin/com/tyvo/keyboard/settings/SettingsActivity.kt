@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.data.Settings
+import com.tyvo.keyboard.data.Languages
 import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.ModelOption
 import com.tyvo.keyboard.data.Readiness
@@ -111,6 +112,7 @@ private fun SettingsScreen(
     var polishOn by remember { mutableStateOf(settings.polishEnabled) }
     var autoPolish by remember { mutableStateOf(settings.autoPolish) }
     var lang by remember { mutableStateOf(settings.languageHint) }
+    var pickingLanguage by remember { mutableStateOf(false) }
     var vocab by remember { mutableStateOf(settings.vocabulary) }
     var showKey by remember { mutableStateOf(false) }
     var notifyOnFail by remember { mutableStateOf(settings.failureNotifications) }
@@ -482,57 +484,86 @@ private fun SettingsScreen(
         }
 
         // ---- accuracy -----------------------------------------------------
-        SectionCard("Transcription accuracy") {
-            // Mistral's Voxtral validates the language code and then ignores
-            // it -- verified against the live API: Russian audio sent with
-            // language=en, and even language=bg, came back byte-identical to
-            // auto-detect. Showing the field there would promise something it
-            // does not do.
-            if (provider == Provider.OPENAI) {
-                OutlinedTextField(
-                    value = lang,
-                    onValueChange = { lang = it; settings.languageHint = it },
-                    label = { Text("Language hint") },
-                    placeholder = { Text("blank = auto-detect, e.g. en, ru, de") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        // ---- language ------------------------------------------------------
+        SectionCard("Language") {
+            val chosen = Languages.byCode(lang)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        chosen?.name ?: "Detect automatically",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        chosen?.native?.takeIf { it != chosen.name }
+                            ?: "The provider works out what you are speaking.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (chosen != null) {
+                    TextButton(onClick = { lang = ""; settings.languageHint = "" }) {
+                        Text("Clear")
+                    }
+                }
+                TextButton(onClick = { pickingLanguage = true }) {
+                    Text(if (chosen == null) "Choose" else "Change")
+                }
+            }
+
+            Text(
+                "Set this only if you dictate in one language. How much it helps " +
+                    "depends on the model: OpenAI documents better accuracy and " +
+                    "lower latency, while Mistral's Voxtral detects the language " +
+                    "itself and currently appears to ignore the hint. It is sent " +
+                    "either way, so it will take effect if that changes.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (lang.isBlank()) {
                 Text(
-                    "An ISO code for the language you usually dictate in. " +
-                        "Improves accuracy on short phrases and saves the model " +
-                        "a detection step. Leave blank if you switch languages.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    "Voxtral detects the language itself and has no hint to set. " +
-                        "Mixed Russian and English dictation transcribes correctly " +
-                        "without one.",
+                    "Leave it on automatic if you switch languages — detection " +
+                        "handled every case tested, down to single words.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
 
+        // ---- vocabulary ----------------------------------------------------
+        SectionCard("Vocabulary") {
             OutlinedTextField(
                 value = vocab,
                 onValueChange = { vocab = it; settings.vocabulary = it },
-                label = { Text("Vocabulary") },
+                label = { Text("Words to expect") },
                 placeholder = { Text("Names and jargon, comma separated") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
             )
             Text(
                 "Words the transcriber keeps getting wrong: product names, " +
-                    "colleagues, technical terms. Sent to bias its spelling, " +
-                    "so it is a nudge rather than a guarantee.",
+                    "colleagues, technical terms. Sent to bias its spelling, so " +
+                    "it is a nudge rather than a guarantee.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+
+    if (pickingLanguage) {
+        LanguagePickerDialog(
+            alreadyChosen = emptyList(),
+            onPick = {
+                lang = it.code
+                settings.languageHint = it.code
+                pickingLanguage = false
+            },
+            onDismiss = { pickingLanguage = false },
+        )
     }
 }
 
