@@ -18,6 +18,7 @@ import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.net.TyvoException
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
+import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.launch
 
 /**
@@ -32,8 +33,10 @@ fun HistoryRoute(
     store: RecordingStore,
     settings: Settings,
     onOpenSettings: () -> Unit,
+    onOpenUsage: () -> Unit,
 ) {
     val context = LocalContext.current
+    val usage = remember(context) { UsageStore(context) }
     val scope = rememberCoroutineScope()
 
     var recordings by remember { mutableStateOf(store.all()) }
@@ -58,12 +61,12 @@ fun HistoryRoute(
             busyId = rec.id
             scope.launch {
                 try {
-                    val text = Transcriber(settings).transcribe(audio)
+                    val text = Transcriber(settings, usage).transcribe(audio)
                     if (text.isBlank()) {
                         store.markFailed(rec.id, "No speech detected.")
                     } else {
                         val finished = if (settings.polishEnabled) {
-                            runCatching { Polisher(settings).cleanUp(text) }.getOrDefault(text)
+                            runCatching { Polisher(settings, usage).cleanUp(text) }.getOrDefault(text)
                         } else text
                         store.markDone(rec.id, finished)
                         toast(context, "Transcribed.")
@@ -100,6 +103,7 @@ fun HistoryRoute(
             refresh()
         },
         onOpenSettings = onOpenSettings,
+        onOpenUsage = onOpenUsage,
     )
 }
 

@@ -30,6 +30,7 @@ fun HistoryScreen(
     onCopy: (Recording) -> Unit,
     onDelete: (Recording) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenUsage: () -> Unit,
 ) {
     val attention = recordings.count { it.needsAttention }
 
@@ -38,6 +39,7 @@ fun HistoryScreen(
             TopAppBar(
                 title = { Text("Tyvo") },
                 actions = {
+                    TextButton(onClick = onOpenUsage) { Text("Usage") }
                     TextButton(onClick = onOpenSettings) { Text("Settings") }
                 },
             )

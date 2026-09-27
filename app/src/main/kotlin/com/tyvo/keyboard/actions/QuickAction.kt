@@ -31,32 +31,45 @@ object QuickActions {
     val FORMAL = QuickAction(
         id = "formal",
         label = "Formal",
-        instruction = "Rewrite in a professional register: full words instead of " +
-            "contractions, no slang, courteous but not stiff. Keep it the same length.",
+        instruction = "Make it sound professional by editing the casual words " +
+            "only: expand contractions, drop openers like \"hey\" and \"so\", " +
+            "and swap slang for its plain equivalent. Keep every other word " +
+            "and the sentence order exactly as spoken -- do not restate their " +
+            "point in your own phrasing, and do not reach for grander " +
+            "vocabulary than they used.",
         group = QuickAction.Group.TONE,
     )
 
     val CASUAL = QuickAction(
         id = "casual",
         label = "Casual",
-        instruction = "Rewrite in a relaxed, conversational register, as if " +
-            "messaging a colleague you know well. Contractions are fine.",
+        instruction = "Adjust the wording to sound relaxed and conversational: " +
+            "use contractions, and swap formal or bureaucratic words for " +
+            "everyday ones. Change only the words that carry the formal tone " +
+            "-- keep the speaker's sentences, order and length, and do not add " +
+            "slang or chattiness they did not say.",
         group = QuickAction.Group.TONE,
     )
 
     val WARMER = QuickAction(
         id = "warmer",
         label = "Warmer",
-        instruction = "Soften the tone. Make it friendlier and less blunt without " +
-            "adding filler or changing what is being said.",
+        instruction = "Take the edge off: turn blunt imperatives into requests, " +
+            "temper harsh or accusatory words, and add a please where one is " +
+            "clearly missing. Change only what carries the bluntness -- keep " +
+            "the speaker's sentences, order and length, and add no new " +
+            "pleasantries or padding.",
         group = QuickAction.Group.TONE,
     )
 
     val DIRECT = QuickAction(
         id = "direct",
         label = "Direct",
-        instruction = "Make it more direct. Remove hedging, apologies and " +
-            "throat-clearing. Say the thing plainly.",
+        instruction = "Make it direct by deleting, not rewriting. Cut every " +
+            "hedge (\"I think\", \"maybe\", \"probably\", \"might\", \"sort of\", " +
+            "\"just\"), filler opener (\"hey so\", \"well\") and unnecessary " +
+            "apology. Leave every surviving word exactly as the speaker said " +
+            "it, and keep all their points.",
         group = QuickAction.Group.TONE,
     )
 

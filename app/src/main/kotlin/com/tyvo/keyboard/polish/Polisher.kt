@@ -4,6 +4,8 @@ import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.net.Http
 import com.tyvo.keyboard.net.TyvoException
+import com.tyvo.keyboard.usage.UsageEvent
+import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -19,7 +21,10 @@ import org.json.JSONObject
  * All three providers are usable here, unlike transcription -- this stage is
  * pure text in, text out.
  */
-class Polisher(private val settings: Settings) {
+class Polisher(
+    private val settings: Settings,
+    private val usage: UsageStore? = null,
+) {
 
     /** Clean-up pass: applies spoken corrections, strips filler, punctuates. */
     suspend fun cleanUp(raw: String): String =
@@ -88,6 +93,7 @@ class Polisher(private val settings: Settings) {
             .build()
 
         val json = Http.json(req, "Polish")
+        usage?.record(UsageStore.eventFrom(json, "OpenAI", model, UsageEvent.Kind.POLISH))
         val text = json.optJSONArray("choices")
             ?.optJSONObject(0)
             ?.optJSONObject("message")
@@ -120,6 +126,7 @@ class Polisher(private val settings: Settings) {
             .build()
 
         val json = Http.json(req, "Polish")
+        usage?.record(UsageStore.eventFrom(json, "Mistral", model, UsageEvent.Kind.POLISH))
         val text = json.optJSONArray("choices")
             ?.optJSONObject(0)
             ?.optJSONObject("message")

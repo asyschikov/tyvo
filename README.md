@@ -1,7 +1,7 @@
 # Tyvo
 
 An Android keyboard that dictates, cleans up what you said, and then lets you
-reshape it — without leaving the keyboard.
+reshape it without leaving the keyboard.
 
 Say:
 
@@ -12,7 +12,7 @@ and the field gets:
 > I am going to cook lasagna.
 
 
-## No backend, and no subscription
+## No backend, and no subscription, full privacy, bring-your-own-key
 
 **There is no server.** Tyvo talks to your AI provider directly from your
 phone and to nothing else — no account, no sign-up, no telemetry, no analytics,
