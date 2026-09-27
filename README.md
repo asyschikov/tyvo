@@ -229,8 +229,6 @@ ceiling is higher.
 
 ## Language
 
-<img src="docs/screenshots/language-picker.png" width="30%" align="right" alt="The language picker, searchable by code, English name or endonym" />
-
 One slot, chosen from a searchable list of 45 languages (matching on code,
 English name or endonym). Blank means auto-detect, which is the right setting
 if you switch languages.
@@ -238,8 +236,6 @@ if you switch languages.
 It is one slot rather than a list because the transcription APIs accept
 exactly one code — a list would only ever send its first entry, which is a
 setting that lies about what it does.
-
-<br clear="right" />
 
 ## Vocabulary
 
