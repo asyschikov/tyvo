@@ -349,6 +349,12 @@ Not yet verified end to end: speaking into the mic and getting polished text
 back. Every part of that path is verified on its own; nobody has yet held the
 mic and talked.
 
+## Privacy
+
+There is no server, so there is very little to say: see
+[PRIVACY.md](PRIVACY.md), which includes the commands to check its claims
+against the source.
+
 ## Licence
 
 GPLv3 — see [LICENSE](LICENSE). Use it, change it, share it; if you distribute
