@@ -4,7 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import android.provider.Settings as AndroidSettings
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
@@ -17,6 +20,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +44,7 @@ import com.tyvo.keyboard.usage.UsageStore
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
+import com.tyvo.keyboard.BuildConfig
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
 import kotlinx.coroutines.launch
@@ -176,6 +182,7 @@ private fun SettingsScreen(
         ActivityResultContracts.RequestPermission()
     ) { notifyGranted = it }
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -246,9 +253,7 @@ private fun SettingsScreen(
         // ---- provider ----------------------------------------------------
         SectionCard("AI provider") {
             Text(
-                "One provider handles both transcription and clean-up, so you " +
-                    "only ever need a single API key. Everything below applies " +
-                    "to whichever you pick here.",
+                "One key covers both transcription and clean-up.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -267,9 +272,7 @@ private fun SettingsScreen(
         SectionCard(provider.label) {
             if (!provider.verified) {
                 Text(
-                    "${provider.label} is built from its published docs but has " +
-                        "not been tested against the live API yet. If it fails, " +
-                        "the error will say why, and OpenAI and Mistral are known " +
+                    "Untested against the live API. OpenAI and Mistral are known " +
                         "to work.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
@@ -291,9 +294,8 @@ private fun SettingsScreen(
                 Text("Show key", style = MaterialTheme.typography.bodyMedium)
             }
             Text(
-                "Stored encrypted on this device and sent only to " +
-                    "${provider.label}. Keys for other providers are kept, so " +
-                    "switching back does not mean pasting it again.",
+                "Stored encrypted, sent only to ${provider.label}. Keys for " +
+                    "other providers are kept.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -408,19 +410,16 @@ private fun SettingsScreen(
                     corrections.size > Correction.defaults.size
                 if (heavy) {
                     Text(
-                        "Each extra correction lengthens the instruction list, " +
-                            "and smaller models start dropping the earlier ones — " +
-                            "measured on Ministral 3B, spoken corrections go from " +
-                            "always applied to rarely. If self-corrections stop " +
-                            "working, switch these off or pick a larger model.",
+                        "Extras crowd out the others on small models: measured " +
+                            "on Ministral 3B, spoken corrections go from always " +
+                            "applied to rarely.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 if (corrections.isEmpty()) {
                     Text(
-                        "With nothing selected the transcript is returned as " +
-                            "spoken, apart from obvious transcription errors.",
+                        "Nothing selected: the transcript is returned as spoken.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -440,7 +439,7 @@ private fun SettingsScreen(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            "Off: raw transcript is inserted; clean-up stays one tap away.",
+                            "Off: insert the raw transcript; clean up on demand.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -480,18 +479,15 @@ private fun SettingsScreen(
             }
 
             Text(
-                "Set this only if you dictate in one language. How much it helps " +
-                    "depends on the model: OpenAI documents better accuracy and " +
-                    "lower latency, while Mistral's Voxtral detects the language " +
-                    "itself and currently appears to ignore the hint. It is sent " +
-                    "either way, so it will take effect if that changes.",
+                "Only worth setting if you dictate in one language. OpenAI " +
+                    "honours it; Mistral detects the language itself and appears " +
+                    "to ignore it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (lang.isBlank()) {
                 Text(
-                    "Leave it on automatic if you switch languages — detection " +
-                        "handled every case tested, down to single words.",
+                    "Detection handled every case tested, down to single words.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -509,15 +505,26 @@ private fun SettingsScreen(
                 minLines = 2,
             )
             Text(
-                "Words the transcriber keeps getting wrong: product names, " +
-                    "colleagues, technical terms. Sent to bias its spelling, so " +
-                    "it is a nudge rather than a guarantee.",
+                "Names and jargon it keeps mishearing. A nudge, not a rule.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        // Leaves room for the floating button to sit over dead space
+        // rather than over the last setting.
+        Spacer(Modifier.height(72.dp))
+    }
+
+    FloatingActionButton(
+        onClick = { sendFeedback(ctx, settings) },
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(20.dp),
+    ) {
+        Icon(Icons.Outlined.MailOutline, contentDescription = "Send feedback")
+    }
     }
 
     if (pickingLanguage) {
@@ -641,6 +648,63 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
         }
     }
 }
+
+/**
+ * Opens a pre-addressed draft in whatever mail app the user has.
+ *
+ * Pre-fills the setup details that make a bug report answerable -- app
+ * version, Android version, device, provider and models -- because asking
+ * for them afterwards costs a round trip. Nothing dictated is included: the
+ * transcripts are the private part, and a feedback button is no place to
+ * leak them.
+ */
+private fun sendFeedback(ctx: Context, settings: Settings) {
+    val provider = settings.provider
+    val body = buildString {
+        append("\n\n\n---\n")
+        append("Tyvo ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
+        append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
+        append("${Build.MANUFACTURER} ${Build.MODEL}\n")
+        append("Provider: ${provider.label}\n")
+        append(
+            "Transcription: " +
+                settings.transcribeModel(provider)
+                    .ifBlank { Transcriber.defaultModelFor(provider) } + "\n"
+        )
+        append(
+            "Clean-up: " +
+                if (!settings.polishEnabled) "off"
+                else settings.polishModel(provider)
+                    .ifBlank { Polisher.defaultModelFor(provider) }
+        )
+    }
+
+    val intent = Intent(Intent.ACTION_SENDTO).apply {
+        // SENDTO with a mailto: URI reaches mail apps only, so the chooser
+        // is not cluttered with every app that accepts plain text.
+        data = Uri.parse("mailto:")
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_ADDRESS))
+        putExtra(Intent.EXTRA_SUBJECT, "Tyvo feedback")
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
+
+    try {
+        ctx.startActivity(Intent.createChooser(intent, "Send feedback"))
+    } catch (e: android.content.ActivityNotFoundException) {
+        // No mail app: leave the address somewhere the user can use it.
+        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(
+            android.content.ClipData.newPlainText("Tyvo feedback address", FEEDBACK_ADDRESS)
+        )
+        Toast.makeText(
+            ctx,
+            "No mail app found. Address copied: $FEEDBACK_ADDRESS",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+}
+
+private const val FEEDBACK_ADDRESS = "asyschikov+tyvo@gmail.com"
 
 @Composable
 private fun ToggleRow(

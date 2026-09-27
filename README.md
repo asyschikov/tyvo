@@ -20,8 +20,8 @@ and transcripts stay on the device, and your key lives in
 `EncryptedSharedPreferences`. Nothing passes through infrastructure belonging
 to this project, because there isn't any.
 
-That is also why it isn't a subscription. Every app in this space wants a
-tenner a month whether you use it twice or two hundred times, routing your
+Tired of subscriptions and rug full "fremiums"? Every app in this space wants a
+10 coins a month whether you use it twice or two hundred times, routing your
 audio through their servers to justify the bill. **Bring your own key and pay
 the provider directly, per second of audio.** A heavy day costs cents; a quiet
 week costs nothing.
