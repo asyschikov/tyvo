@@ -12,41 +12,33 @@ and the field gets:
 > I am going to cook lasagna.
 
 
-## No backend, and no subscription, full privacy, bring-your-own-key
+## No backend, and no subscription
 
-**There is no server.** Tyvo talks to your AI provider directly from your
-phone and to nothing else — no account, no sign-up, no telemetry, no analytics,
-no crash reporting, nowhere for your voice to end up but the provider you chose.
-Your recordings and transcripts stay on the device; your API key is held in
-`EncryptedSharedPreferences` and is sent to that one provider and no one else.
-Nothing passes through infrastructure belonging to this project, because there
-isn't any.
+**There is no server.** Tyvo talks to your AI provider and nothing else — no
+account, no sign-up, no telemetry, no analytics, no crash reporting. Recordings
+and transcripts stay on the device, and your key lives in
+`EncryptedSharedPreferences`. Nothing passes through infrastructure belonging
+to this project, because there isn't any.
 
-That is also why it is not a subscription. Every dictation app in this space
-seems to want £10 a month whether you use it twice or two hundred times, with
-your audio flowing through their servers to justify the bill. I got tired of it.
-**Bring your own key and pay the provider directly, per second of audio.** A
-heavy day costs cents; a quiet week costs nothing. No tier you outgrow, no
-seat you forget to cancel, and no middleman with a copy of everything you said.
+That is also why it isn't a subscription. Every app in this space wants a
+tenner a month whether you use it twice or two hundred times, routing your
+audio through their servers to justify the bill. **Bring your own key and pay
+the provider directly, per second of audio.** A heavy day costs cents; a quiet
+week costs nothing.
 
-Pick OpenAI or Mistral, paste a key, done. If a provider disappoints you, switch
-— the choice stays yours, which is the point.
-
-Don't take that on trust — it is checkable in a few seconds:
+Checkable in a few seconds, rather than taken on trust:
 
 ```sh
-# every URL the app can reach
+# every host the app can reach
 grep -rhoE 'https?://[a-zA-Z0-9.-]+' app/src/main/kotlin/ | sort -u
-#   https://api.mistral.ai
-#   https://api.openai.com
 
 # no analytics, crash reporting or telemetry SDKs
 grep -iE "firebase|crashlytics|analytics|sentry|bugsnag" app/build.gradle.kts
 ```
 
-The dependency list is AndroidX, the Kotlin standard library and OkHttp. The
-permissions are `RECORD_AUDIO`, `INTERNET`, `VIBRATE` and `POST_NOTIFICATIONS`
-— no contacts, no storage, no location, no device identifiers.
+Dependencies are AndroidX, the Kotlin standard library and OkHttp. Permissions
+are `RECORD_AUDIO`, `INTERNET`, `VIBRATE` and `POST_NOTIFICATIONS` — no
+contacts, storage, location or device identifiers.
 
 ## How it works
 
