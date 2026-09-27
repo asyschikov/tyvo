@@ -12,8 +12,8 @@ import android.os.VibratorManager
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Toast
 import android.view.inputmethod.InputConnection
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
@@ -50,6 +50,9 @@ class TyvoInputMethodService : InputMethodService() {
     private companion object {
         /** Marks a variant produced by a typed instruction rather than a chip. */
         const val CUSTOM_ACTION_ID = "__custom__"
+
+        /** How far back to look when deleting a word. */
+        const val WORD_LOOKBEHIND = 96
 
         /**
          * Substrings that mark a typed instruction as a translation request,
@@ -105,8 +108,9 @@ class TyvoInputMethodService : InputMethodService() {
         v.onRetry = { retryLast() }
         v.onOpenSettings = { openSettings() }
         v.onSwitchKeyboard = { switchAway() }
-        v.onBackspace = { backspace() }
-        v.onNewline = { commitNewline() }
+        v.onBackspace = { byWord -> backspace(byWord) }
+        v.onNewline = { commitLiteral("\n") }
+        v.onSpace = { commitLiteral(" ") }
         v.onCustomInstruction = { runCustom(it) }
         view = v
         render(UiState.Idle())
@@ -504,7 +508,15 @@ class TyvoInputMethodService : InputMethodService() {
      * Falls back to a real key event when we cannot read the selection, which
      * is the case in a few webview-backed fields.
      */
-    private fun backspace() {
+    /**
+     * Deletes one character, or a whole word once a held backspace has been
+     * repeating for a while.
+     *
+     * [byWord] is what the accelerating repeat escalates to: holding delete
+     * to clear a sentence one letter at a time is slow enough that people
+     * give up and reach for the text field instead.
+     */
+    private fun backspace(byWord: Boolean = false) {
         val ic = currentInputConnection ?: return
         // Editing invalidates the session: our committed text no longer matches.
         session.clear()
@@ -513,6 +525,8 @@ class TyvoInputMethodService : InputMethodService() {
         val selected = ic.getSelectedText(0)
         if (selected != null && selected.isNotEmpty()) {
             ic.commitText("", 1)
+        } else if (byWord) {
+            deleteWordBefore(ic)
         } else {
             val before = ic.getTextBeforeCursor(2, 0)
             if (before == null) {
@@ -526,15 +540,48 @@ class TyvoInputMethodService : InputMethodService() {
                 ic.deleteSurroundingText(n, 0)
             }
         }
-        render(UiState.Idle())
+        render(UiState.Idle(canRetry = lastFailedId != null))
     }
 
-    private fun commitNewline() {
+    /**
+     * Deletes the word before the cursor, plus the whitespace that trailed it.
+     *
+     * Looks back a bounded window rather than the whole field: the text can
+     * be arbitrarily long, and a word is never far away.
+     */
+    private fun deleteWordBefore(ic: InputConnection) {
+        val before = ic.getTextBeforeCursor(WORD_LOOKBEHIND, 0)
+        if (before.isNullOrEmpty()) {
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            return
+        }
+        var i = before.length
+        // Trailing whitespace goes with the word, so one hold does not stall
+        // on the space after it.
+        while (i > 0 && before[i - 1].isWhitespace()) i--
+        if (i > 0) {
+            val letters = before[i - 1].isLetterOrDigit()
+            while (i > 0 && !before[i - 1].isWhitespace() &&
+                before[i - 1].isLetterOrDigit() == letters
+            ) i--
+        }
+        val count = before.length - i
+        ic.deleteSurroundingText(if (count > 0) count else 1, 0)
+    }
+
+    /**
+     * Types a literal character.
+     *
+     * Ends the session: once the user puts their own text in the field, the
+     * committed text is no longer the last thing there, so the quick actions
+     * would have nothing safe to replace.
+     */
+    private fun commitLiteral(text: String) {
         val ic = currentInputConnection ?: return
-        ic.commitText("\n", 1)
+        ic.commitText(text, 1)
         session.clear()
         committed = ""
-        render(UiState.Idle())
+        render(UiState.Idle(canRetry = lastFailedId != null))
     }
 
     // ---- Misc -----------------------------------------------------------

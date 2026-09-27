@@ -21,7 +21,7 @@ data class QuickAction(
      */
     val translating: Boolean = false,
 ) {
-    enum class Group { TONE, LENGTH, FORM, FIX }
+    enum class Group { TONE, LENGTH, FIX }
 }
 
 object QuickActions {
@@ -88,51 +88,6 @@ object QuickActions {
         group = QuickAction.Group.LENGTH,
     )
 
-    // ---- Form -----------------------------------------------------------
-
-    val EMAIL = QuickAction(
-        id = "email",
-        label = "Email",
-        instruction = "Format as a short email body with a greeting and a " +
-            "sign-off. Do not invent names. Write the greeting and sign-off in " +
-            "the same language as the text -- use that language's ordinary " +
-            "equivalents of 'Hi,' and 'Thanks,', never the English words " +
-            "unless the text itself is English.",
-        group = QuickAction.Group.FORM,
-    )
-
-    val MESSAGE = QuickAction(
-        id = "message",
-        label = "Chat",
-        instruction = "Format as a single chat message: compact, no greeting, no " +
-            "sign-off, no subject line.",
-        group = QuickAction.Group.FORM,
-    )
-
-    val COMMIT = QuickAction(
-        id = "commit",
-        label = "Commit",
-        instruction = "Rewrite as a git commit message: imperative mood subject " +
-            "line under 72 characters, then a blank line and body only if the " +
-            "text warrants one. Commit messages are conventionally English " +
-            "and lowercase-hyphenated, but neither convention applies here: " +
-            "write ordinary prose in the same language as the input. Output " +
-            "the commit message alone -- no notes, no " +
-            "explanation of your choices, no markdown fences, no horizontal " +
-            "rules, and never repeat it twice.",
-        group = QuickAction.Group.FORM,
-    )
-
-    val PROMPT = QuickAction(
-        id = "prompt",
-        label = "Prompt",
-        instruction = "Rewrite as a clear, well-specified instruction addressed to " +
-            "an AI assistant: state the goal, constraints and desired output " +
-            "format. Keep the user's intent exactly. Write the instruction as " +
-            "plain prose with no headings, labels or bold markers.",
-        group = QuickAction.Group.FORM,
-    )
-
     // ---- Fix ------------------------------------------------------------
 
     val PROOFREAD = QuickAction(
@@ -175,7 +130,7 @@ object QuickActions {
     val ALL: List<QuickAction> = listOf(
         PROOFREAD, SHORTER, DIRECT, FORMAL, CASUAL, WARMER,
         TIGHTEN, PUNCTUATE, EXPAND, BULLETS,
-        EMAIL, MESSAGE, COMMIT, PROMPT, TRANSLATE_EN,
+        TRANSLATE_EN,
     )
 
     fun byId(id: String): QuickAction? = ALL.firstOrNull { it.id == id }

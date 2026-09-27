@@ -41,8 +41,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onRetry: () -> Unit = {}
     var onOpenSettings: () -> Unit = {}
     var onSwitchKeyboard: () -> Unit = {}
-    var onBackspace: () -> Unit = {}
+    var onBackspace: (byWord: Boolean) -> Unit = {}
     var onNewline: () -> Unit = {}
+    var onSpace: () -> Unit = {}
     var onCustomInstruction: (String) -> Unit = {}
 
     private val status: TextView
@@ -145,7 +146,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         doneButton = pill("Done", accent = false) { onAccept() }
         controls.addView(doneButton, lp(WRAP, dp(56)))
 
-        val back = pill("⌫", accent = false) { onBackspace() }
+        val back = repeatingPill("⌫") { byWord -> onBackspace(byWord) }
         controls.addView(back, lp(dp(52), dp(56)).also { it.leftMargin = dp(6) })
 
         addView(controls, lp(MATCH, WRAP))
@@ -226,8 +227,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         if (canRetry) {
             actionStrip.addView(chip("↻ Retry", selected = true) { onRetry() })
         }
+        actionStrip.addView(chip("Space") { onSpace() })
+        actionStrip.addView(chip("Newline") { onNewline() })
         actionStrip.addView(chip("Settings") { onOpenSettings() })
-        actionStrip.addView(chip("↵ Newline") { onNewline() })
     }
 
     /**
@@ -300,6 +302,58 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             setOnClickListener { onTap() }
         }
 
+    /**
+     * A key that fires once on tap, then repeats while held, then starts
+     * deleting whole words.
+     *
+     * The escalation matters: clearing a sentence one character at a time is
+     * slow enough that people give up and go poke at the text field instead.
+     * Timings follow the platform's own feel -- a pause before the repeat
+     * starts so a tap is never mistaken for a hold, then acceleration.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun repeatingPill(label: String, onFire: (byWord: Boolean) -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextColor(FG)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            background = roundedDrawable(SURFACE, dp(13).toFloat())
+            isClickable = true
+
+            var repeats = 0
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            lateinit var tick: Runnable
+
+            tick = Runnable {
+                repeats++
+                // Characters first, then words once it is clearly a hold.
+                val byWord = repeats >= REPEATS_BEFORE_WORDS
+                onFire(byWord)
+                val delay = if (byWord) WORD_REPEAT_MS else CHAR_REPEAT_MS
+                handler.postDelayed(tick, delay)
+            }
+
+            setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        v.isPressed = true
+                        repeats = 0
+                        onFire(false)
+                        handler.postDelayed(tick, FIRST_REPEAT_DELAY_MS)
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP,
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        handler.removeCallbacks(tick)
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+
     private fun roundedDrawable(color: Int, radius: Float) =
         android.graphics.drawable.GradientDrawable().apply {
             setColor(color)
@@ -334,5 +388,12 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         val ACCENT_DIM = Color.parseColor("#33507F")
         val REC = Color.parseColor("#E5484D")
         val WARN = Color.parseColor("#F5A524")
+
+        /** Long enough that a tap is never mistaken for a hold. */
+        const val FIRST_REPEAT_DELAY_MS = 400L
+        const val CHAR_REPEAT_MS = 55L
+        /** Roughly a second of characters before escalating to words. */
+        const val REPEATS_BEFORE_WORDS = 14
+        const val WORD_REPEAT_MS = 130L
     }
 }

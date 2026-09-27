@@ -1,5 +1,6 @@
 package com.tyvo.keyboard
 
+import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Prompts
@@ -10,6 +11,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QuickActionsTest {
+
+    @Test
+    fun `form modifiers are gone`() {
+        // Email, Chat, Commit and Prompt were removed: they reformatted text
+        // rather than restyling it, which is a different job.
+        val ids = QuickActions.ALL.map { it.id }
+        listOf("email", "message", "commit", "prompt").forEach {
+            assertFalse("$it should no longer be offered", it in ids)
+        }
+        assertTrue(
+            "no action should remain in the FORM group",
+            QuickAction.Group.entries.none { it.name == "FORM" },
+        )
+    }
 
     @Test
     fun `action ids are unique`() {
