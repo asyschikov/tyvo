@@ -4,6 +4,8 @@ import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.Http
 import com.tyvo.keyboard.net.TyvoException
+import com.tyvo.keyboard.usage.UsageEvent
+import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,7 +18,10 @@ import java.io.File
 /**
  * Turns a recorded WAV into text.
  */
-class Transcriber(private val settings: Settings) {
+class Transcriber(
+    private val settings: Settings,
+    private val usage: UsageStore? = null,
+) {
 
     suspend fun transcribe(audio: File): String = withContext(Dispatchers.IO) {
         when (settings.provider) {
@@ -60,6 +65,9 @@ class Transcriber(private val settings: Settings) {
             .build()
 
         val json = Http.json(req, "OpenAI transcription")
+        usage?.record(
+            UsageStore.eventFrom(json, "OpenAI", model, UsageEvent.Kind.TRANSCRIBE)
+        )
         return json.optString("text").trim()
     }
 
@@ -98,6 +106,9 @@ class Transcriber(private val settings: Settings) {
             .build()
 
         val json = Http.json(req, "Mistral transcription")
+        usage?.record(
+            UsageStore.eventFrom(json, "Mistral", model, UsageEvent.Kind.TRANSCRIBE)
+        )
         return json.optString("text").trim()
     }
 

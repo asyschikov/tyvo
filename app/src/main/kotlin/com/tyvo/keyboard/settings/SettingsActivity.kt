@@ -34,6 +34,8 @@ import com.tyvo.keyboard.data.Readiness
 import androidx.activity.compose.BackHandler
 import com.tyvo.keyboard.history.HistoryRoute
 import com.tyvo.keyboard.onboarding.WelcomeScreen
+import com.tyvo.keyboard.usage.UsageScreen
+import com.tyvo.keyboard.usage.UsageStore
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
@@ -45,7 +47,7 @@ import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
 
 /** Which of the app's screens is showing. */
-private enum class Screen { WELCOME, HISTORY, SETTINGS }
+private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE }
 
 class SettingsActivity : ComponentActivity() {
 
@@ -89,6 +91,7 @@ class SettingsActivity : ComponentActivity() {
                             store = store,
                             settings = settings,
                             onOpenSettings = { screen = Screen.SETTINGS },
+                            onOpenUsage = { screen = Screen.USAGE },
                         )
 
                         Screen.SETTINGS -> SettingsScreen(
@@ -96,11 +99,21 @@ class SettingsActivity : ComponentActivity() {
                             activity = this,
                             onBack = { screen = Screen.HISTORY },
                         )
+
+                        Screen.USAGE -> {
+                            val usageStore = remember { UsageStore(this) }
+                            var rows by remember { mutableStateOf(usageStore.all()) }
+                            UsageScreen(
+                                rows = rows,
+                                onClear = { usageStore.clear(); rows = usageStore.all() },
+                                onBack = { screen = Screen.HISTORY },
+                            )
+                        }
                     }
 
-                    BackHandler(enabled = screen == Screen.SETTINGS) {
-                        screen = Screen.HISTORY
-                    }
+                    BackHandler(
+                        enabled = screen == Screen.SETTINGS || screen == Screen.USAGE
+                    ) { screen = Screen.HISTORY }
                 }
             }
         }

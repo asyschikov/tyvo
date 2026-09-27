@@ -21,6 +21,7 @@ import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
+import com.tyvo.keyboard.usage.UsageStore
 import com.tyvo.keyboard.net.TyvoException
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.settings.SettingsActivity
@@ -71,6 +72,7 @@ class TyvoInputMethodService : InputMethodService() {
     private lateinit var transcriber: Transcriber
     private lateinit var polisher: Polisher
     private lateinit var store: RecordingStore
+    private lateinit var usage: UsageStore
 
     /** Most recent failed recording, retryable straight from the keyboard. */
     private var lastFailedId: String? = null
@@ -91,9 +93,11 @@ class TyvoInputMethodService : InputMethodService() {
         super.onCreate()
         settings = Settings(this)
         recorder = AudioRecorder(cacheDir)
-        transcriber = Transcriber(settings)
-        polisher = Polisher(settings)
         store = RecordingStore(this)
+        // Before the two clients: they hold a reference to it.
+        usage = UsageStore(this)
+        transcriber = Transcriber(settings, usage)
+        polisher = Polisher(settings, usage)
         Maintenance.runInBackground(store, settings)
     }
 
