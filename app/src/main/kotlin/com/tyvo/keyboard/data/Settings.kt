@@ -13,9 +13,15 @@ import com.tyvo.keyboard.polish.Correction
  * the two stages would mean holding two API keys to do one job, which is not
  * a trade worth offering by default.
  */
-enum class Provider(val label: String) {
+enum class Provider(
+    val label: String,
+    /** False until someone has actually dictated through it end to end. */
+    val verified: Boolean = true,
+) {
     OPENAI("OpenAI"),
-    MISTRAL("Mistral");
+    MISTRAL("Mistral"),
+    XAI("xAI (Grok)", verified = false),
+    GEMINI("Google Gemini", verified = false);
 }
 
 /**
@@ -68,6 +74,8 @@ class Settings(context: Context) {
     private fun keyName(p: Provider) = when (p) {
         Provider.OPENAI -> KEY_OPENAI
         Provider.MISTRAL -> KEY_MISTRAL
+        Provider.XAI -> KEY_XAI
+        Provider.GEMINI -> KEY_GEMINI
     }
 
     // ---- Models ----------------------------------------------------------
@@ -194,6 +202,8 @@ class Settings(context: Context) {
         const val KEY_PROVIDER = "provider"
         const val KEY_OPENAI = "openai_key"
         const val KEY_MISTRAL = "mistral_key"
+        const val KEY_XAI = "xai_key"
+        const val KEY_GEMINI = "gemini_key"
         const val KEY_AUTOPOLISH = "auto_polish"
         const val KEY_POLISH_ON = "polish_enabled"
         const val KEY_NOTIFY_FAIL = "notify_failures"

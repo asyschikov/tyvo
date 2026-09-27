@@ -40,10 +40,20 @@ class ProviderDefaultsTest {
     }
 
     @Test
-    fun `both providers are offered`() {
+    fun `all four providers are offered`() {
         val names = Provider.entries.map { it.name }
-        listOf("OPENAI", "MISTRAL").forEach {
+        listOf("OPENAI", "MISTRAL", "XAI", "GEMINI").forEach {
             assertTrue("$it missing from providers", it in names)
         }
+    }
+
+    @Test
+    fun `providers built from docs alone are marked unverified`() {
+        // The flag drives a warning in settings. It must stay false until
+        // someone has actually dictated through them.
+        assertTrue("OpenAI was verified against the live API", Provider.OPENAI.verified)
+        assertTrue("Mistral was verified against the live API", Provider.MISTRAL.verified)
+        assertFalse("xAI has not been run against the live API", Provider.XAI.verified)
+        assertFalse("Gemini has not been run against the live API", Provider.GEMINI.verified)
     }
 }
