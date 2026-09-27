@@ -38,6 +38,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // For version name and code in the feedback email.
+        buildConfig = true
     }
     sourceSets {
         getByName("main") {
