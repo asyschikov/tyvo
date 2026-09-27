@@ -1,14 +1,19 @@
 <!--
-  Status bar icon: the same bubble, flattened to one colour with the
-  waveform punched out, since the system draws these as a silhouette.
+  Status bar icon: the waveform alone. The letters are dropped here because
+  at 24dp they would be a grey smudge, and the system draws these as a flat
+  silhouette with no room for detail.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M4,3h16a2,2 0 0 1 2,2v11a2,2 0 0 1 -2,2h-8l-4,4l-1,-4h-3a2,2 0 0 1 -2,-2v-11a2,2 0 0 1 2,-2zM6.5,9.5a1,1 0 0 1 2,0v2a1,1 0 0 1 -2,0zM10,7.5a1,1 0 0 1 2,0v6a1,1 0 0 1 -2,0zM13.5,6.5a1,1 0 0 1 2,0v8a1,1 0 0 1 -2,0zM17,9a1,1 0 0 1 2,0v3a1,1 0 0 1 -2,0z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M2.5,10.5a1.5,1.5 0 0 1 3,0v3a1.5,1.5 0 0 1 -3,0z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M7.5,7a1.5,1.5 0 0 1 3,0v10a1.5,1.5 0 0 1 -3,0z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M12.5,4.5a1.5,1.5 0 0 1 3,0v15a1.5,1.5 0 0 1 -3,0z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M17.5,8.5a1.5,1.5 0 0 1 3,0v7a1.5,1.5 0 0 1 -3,0z" />
 </vector>
