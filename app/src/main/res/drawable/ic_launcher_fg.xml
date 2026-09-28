@@ -2,12 +2,15 @@
   A waveform above the word TyVo: speech on top, text below.
 
   Geometry, all measured rather than eyeballed:
-    - the mark spans y 34..74.6, centred within half a unit of 54
+    - the waveform occupies y 32.5..54.5 and the letters y 57.5..75.5, so
+      there is a clear 3-unit gap between them. They used to overlap by 4.7,
+      because the tall middle bar reached further down than the band it was
+      nominally centred in.
+    - the mark spans y 32.5..75.5, centred on 54, the canvas centre
     - both halves centre on x=54 exactly
-    - the bars are evenly pitched at 8.6, their heights mirror about the
-      middle one (7, 13, 25, 13, 7), and every bar shares a vertical centre
-      at y=46.5
-    - nothing exceeds radius 29 from the centre, inside the 36 the circular
+    - the bars are evenly pitched and their heights mirror about the middle
+      one, every bar sharing one vertical centre line
+    - nothing exceeds radius 28 from the centre, inside the 36 the circular
       launcher mask keeps
 
   The letters are real Arial Bold outlines converted to paths, not hand-drawn
@@ -22,29 +25,29 @@
 
     <!-- waveform -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M34.4,45.4a2.4,2.4 0 0 1 4.8,0v2.2a2.4,2.4 0 0 1 -4.8,0z" />
+        android:pathData="M34.4,42.82a2.4,2.4 0 0 1 4.8,0v1.36a2.4,2.4 0 0 1 -4.8,0z" />
     <path android:fillColor="#FFFFFF"
-        android:pathData="M43,42.4a2.4,2.4 0 0 1 4.8,0v8.2a2.4,2.4 0 0 1 -4.8,0z" />
+        android:pathData="M43,40.18a2.4,2.4 0 0 1 4.8,0v6.64a2.4,2.4 0 0 1 -4.8,0z" />
     <path android:fillColor="#FFFFFF"
-        android:pathData="M51.6,36.4a2.4,2.4 0 0 1 4.8,0v20.2a2.4,2.4 0 0 1 -4.8,0z" />
+        android:pathData="M51.6,34.9a2.4,2.4 0 0 1 4.8,0v17.2a2.4,2.4 0 0 1 -4.8,0z" />
     <path android:fillColor="#FFFFFF"
-        android:pathData="M60.2,42.4a2.4,2.4 0 0 1 4.8,0v8.2a2.4,2.4 0 0 1 -4.8,0z" />
+        android:pathData="M60.2,40.18a2.4,2.4 0 0 1 4.8,0v6.64a2.4,2.4 0 0 1 -4.8,0z" />
     <path android:fillColor="#FFFFFF"
-        android:pathData="M68.8,45.4a2.4,2.4 0 0 1 4.8,0v2.2a2.4,2.4 0 0 1 -4.8,0z" />
+        android:pathData="M68.8,42.82a2.4,2.4 0 0 1 4.8,0v1.36a2.4,2.4 0 0 1 -4.8,0z" />
 
     <!-- T -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M30.07,70V56.92H25.4V54.25H37.91V56.92H33.25V70Z" />
+        android:pathData="M32.86,71.41V59.85H28.74V57.5H39.79V59.85H35.67V71.41Z" />
 
     <!-- y -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M38.52,58.59H41.73L44.46,66.69L47.12,58.59H50.25L46.22,69.57L45.5,71.56Q45.1,72.56,44.74,73.08Q44.38,73.61,43.91,73.94Q43.45,74.26,42.76,74.45Q42.08,74.63,41.22,74.63Q40.35,74.63,39.51,74.45L39.25,72.08Q39.95,72.22,40.52,72.22Q41.58,72.22,42.08,71.61Q42.59,70.99,42.85,70.03Z" />
+        android:pathData="M40.32,61.33H43.16L45.57,68.49L47.92,61.33H50.68L47.13,71.03L46.49,72.79Q46.14,73.67,45.82,74.13Q45.5,74.6,45.09,74.89Q44.68,75.18,44.07,75.34Q43.47,75.5,42.71,75.5Q41.94,75.5,41.2,75.34L40.97,73.25Q41.59,73.37,42.1,73.37Q43.03,73.37,43.47,72.83Q43.92,72.28,44.16,71.44Z" />
 
     <!-- V -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M56.22,70,50.59,54.25H54.04L58.02,65.91L61.88,54.25H65.25L59.61,70Z" />
+        android:pathData="M55.96,71.41,50.99,57.5H54.03L57.55,67.8L60.96,57.5H63.94L58.96,71.41Z" />
 
     <!-- o -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M66.15,64.13Q66.15,62.63,66.9,61.22Q67.64,59.82,69,59.08Q70.35,58.33,72.03,58.33Q74.62,58.33,76.27,60.02Q77.93,61.7,77.93,64.26Q77.93,66.85,76.26,68.56Q74.59,70.26,72.05,70.26Q70.48,70.26,69.06,69.55Q67.64,68.84,66.9,67.47Q66.15,66.1,66.15,64.13ZM69.25,64.3Q69.25,65.99,70.05,66.9Q70.86,67.8,72.04,67.8Q73.22,67.8,74.02,66.9Q74.82,65.99,74.82,64.27Q74.82,62.6,74.02,61.7Q73.22,60.79,72.04,60.79Q70.86,60.79,70.05,61.7Q69.25,62.6,69.25,64.3Z" />
+        android:pathData="M64.74,66.23Q64.74,64.9,65.39,63.66Q66.05,62.42,67.25,61.76Q68.45,61.11,69.93,61.11Q72.21,61.11,73.67,62.59Q75.14,64.08,75.14,66.34Q75.14,68.63,73.66,70.13Q72.19,71.64,69.95,71.64Q68.56,71.64,67.3,71.01Q66.05,70.39,65.39,69.18Q64.74,67.97,64.74,66.23ZM67.47,66.37Q67.47,67.87,68.18,68.67Q68.89,69.47,69.94,69.47Q70.98,69.47,71.69,68.67Q72.39,67.87,72.39,66.35Q72.39,64.87,71.69,64.08Q70.98,63.28,69.94,63.28Q68.89,63.28,68.18,64.08Q67.47,64.87,67.47,66.37Z" />
 </vector>
