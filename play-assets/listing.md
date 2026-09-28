@@ -34,7 +34,7 @@ becomes "meet at six". "Email Sarah — scratch that — email Tom" becomes
 RESHAPE IT WITHOUT RETYPING
 
 Once the text is there, one tap makes it shorter, more formal, more direct,
-warmer, or a bulleted list. Or type an instruction in your own words. Every
+warmer, or a bulleted list. Every
 change is one tap to undo, and each one works from your original text rather
 than stacking on the last edit.
 

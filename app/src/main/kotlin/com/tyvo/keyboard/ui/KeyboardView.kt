@@ -91,7 +91,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onBackspace: (byWord: Boolean) -> Unit = {}
     var onNewline: () -> Unit = {}
     var onSpace: () -> Unit = {}
-    var onCustomInstruction: (String) -> Unit = {}
 
     private val status: TextView
     private val waveform: WaveformView
@@ -100,8 +99,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private val micButton: TextView
     private val undoButton: TextView
     private val doneButton: TextView
-    private val customInput: EditText
-    private val customRow: LinearLayout
     private val controls: LinearLayout
 
     /** True while the mic button is standing in as the setup prompt. */
@@ -139,28 +136,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         // --- waveform ----------------------------------------------------
         waveform = WaveformView(context)
         addView(waveform, lp(MATCH, dp(28)).also { it.bottomMargin = dp(4) })
-
-        // --- custom instruction row (hidden until asked for) -------------
-        customRow = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            visibility = GONE
-        }
-        customInput = EditText(context).apply {
-            hint = "Tell Tyvo how to change it…"
-            setHintTextColor(c.fgFaint)
-            setTextColor(c.fg)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setBackgroundColor(c.surface)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            maxLines = 2
-            isSingleLine = true
-            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
-            setOnEditorActionListener { _, _, _ -> submitCustom(); true }
-        }
-        customRow.addView(customInput, LayoutParams(0, dp(44), 1f))
-        val goButton = pill("Go", accent = true) { submitCustom() }
-        customRow.addView(goButton, lp(WRAP, dp(44)).also { it.leftMargin = dp(6) })
-        addView(customRow, lp(MATCH, WRAP).also { it.bottomMargin = dp(6) })
 
         // --- action strip -------------------------------------------------
         actionStrip = LinearLayout(context).apply { orientation = HORIZONTAL }
@@ -236,7 +211,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 micIsSetupPrompt = true
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
-                customRow.visibility = GONE
                 showIdleActions(canRetry = false)
             }
 
@@ -248,7 +222,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 micButton.background = roundedDrawable(c.accent, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
-                customRow.visibility = GONE
                 showIdleActions(state.canRetry)
             }
 
@@ -259,7 +232,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 micButton.background = roundedDrawable(c.rec, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
-                customRow.visibility = GONE
                 actionStrip.removeAllViews()
             }
 
@@ -270,7 +242,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 micButton.background = roundedDrawable(c.accentDim, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
-                customRow.visibility = GONE
                 actionStrip.removeAllViews()
             }
 
@@ -285,7 +256,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 micButton.background = roundedDrawable(c.accent, dp(14).toFloat())
                 undoButton.visibility = if (state.canUndo) VISIBLE else GONE
                 doneButton.visibility = VISIBLE
-                customRow.visibility = VISIBLE
                 showReviewActions(state, enabled = !state.busy)
             }
         }
@@ -339,12 +309,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         actionScroll.scrollTo(0, 0)
     }
 
-    private fun submitCustom() {
-        val text = customInput.text?.toString()?.trim().orEmpty()
-        if (text.isEmpty()) return
-        customInput.setText("")
-        onCustomInstruction(text)
-    }
 
     // ---- small builders --------------------------------------------------
 
