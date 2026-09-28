@@ -31,6 +31,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
@@ -96,7 +97,13 @@ class SettingsActivity : ComponentActivity() {
         val activity = this
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            // Follow the device rather than forcing dark: an app that
+            // ignores the system setting is the one thing every light-mode
+            // user notices immediately.
+            MaterialTheme(
+                colorScheme = if (isSystemInDarkTheme()) darkColorScheme()
+                else lightColorScheme()
+            ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                   Box(Modifier.fillMaxSize()) {
                     // History is home once the user is set up; the welcome

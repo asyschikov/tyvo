@@ -38,7 +38,12 @@ class WaveformView(context: Context) : View(context) {
 
     private val levels = ArrayDeque<Float>()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4C7DF0")
+        // Matches the keyboard's accent for the active theme.
+        color = if (
+            context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        ) Color.parseColor("#4C7DF0") else Color.parseColor("#3A63D0")
     }
     private val rect = RectF()
     private var capacity = 48
