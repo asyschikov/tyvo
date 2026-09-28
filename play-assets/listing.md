@@ -123,17 +123,18 @@ Generate a key for this and revoke it after review.
 
 ## Screenshots
 
-In `screenshots/`, five at 1080×2424, which Play accepts as-is. Upload in
+In `screenshots/`, six at 1080×2424, which Play accepts as-is. Upload in
 filename order:
 
-1. **Keyboard, after a dictation** — polished text in the field with the
-   Undo clean-up / Re-clean / Proofread chips showing. The one that explains
-   the product.
-2. **Keyboard, idle** — Space, Newline, Settings and the Speak button.
-3. **History** — a few transcripts including one the model turned into a
-   numbered list.
-4. **Settings** — provider choice, masked key, model pickers.
-5. **Usage** — audio seconds and tokens per model.
+1. **A dictated note** — a shopping list spoken in one go, come out as
+   paragraphs and bullets, with the Proofread / Shorter / Direct / Formal
+   chips beneath. The one that explains the product, and the one to lead with.
+2. **Keyboard in a chat** — polished text with the Undo clean-up and
+   Re-clean chips, showing the actions work anywhere.
+3. **Keyboard, idle** — Space, Newline, Settings and the Speak button.
+4. **History** — a few transcripts, including one turned into a numbered list.
+5. **Settings** — provider choice, masked key, model pickers.
+6. **Usage** — audio seconds and tokens per model.
 
-The surname in the chat header of 1 and 2 is pixelated. Everything else in
+The surname in the chat header of 2 and 3 is pixelated. Everything else in
 them is intentional.
