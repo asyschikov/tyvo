@@ -1,3 +1,11 @@
 <resources>
-    <style name="Theme.Tyvo" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      DayNight rather than Light: this theme paints the window before Compose
+      draws anything, so a hardcoded light background flashed white on the
+      way into a dark UI.
+    -->
+    <style name="Theme.Tyvo" parent="android:Theme.DeviceDefault.DayNight" >
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

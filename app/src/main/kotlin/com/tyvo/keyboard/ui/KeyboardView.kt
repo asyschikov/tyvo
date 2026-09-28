@@ -46,8 +46,29 @@ import com.tyvo.keyboard.ime.UiState
  * the control row with the mic. Built in code rather than XML so the whole
  * layout stays readable in one place.
  */
+/** The colours the keyboard draws with, in one theme. */
+private data class Palette(
+    val bg: Int,
+    val surface: Int,
+    val fg: Int,
+    val fgDim: Int,
+    val fgFaint: Int,
+    val accent: Int,
+    val accentDim: Int,
+    val rec: Int,
+    val warn: Int,
+    val onAccent: Int,
+)
+
 @SuppressLint("ViewConstructor")
 class KeyboardView(context: Context) : LinearLayout(context) {
+
+    /** Resolved once per view: the IME is recreated when night mode flips. */
+    private val c: Palette =
+        if (context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        ) DARK else LIGHT
 
     var onMicPressed: () -> Unit = {}
     var onAction: (QuickAction) -> Unit = {}
@@ -79,7 +100,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(BG)
+        setBackgroundColor(c.bg)
         val pad = dp(8)
         // One gap value for the space above the first row and between rows,
         // so the keyboard does not sit tighter against its own top edge than
@@ -97,7 +118,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
         // --- status line -------------------------------------------------
         status = TextView(context).apply {
-            setTextColor(FG_DIM)
+            setTextColor(c.fgDim)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 2
@@ -117,10 +138,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         }
         customInput = EditText(context).apply {
             hint = "Tell Tyvo how to change it…"
-            setHintTextColor(FG_FAINT)
-            setTextColor(FG)
+            setHintTextColor(c.fgFaint)
+            setTextColor(c.fg)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setBackgroundColor(SURFACE)
+            setBackgroundColor(c.surface)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             maxLines = 2
             isSingleLine = true
@@ -138,7 +159,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             isHorizontalScrollBarEnabled = false
             addView(actionStrip)
         }
-        addView(actionScroll, lp(MATCH, dp(46)).also { it.bottomMargin = rowGap })
+        // Exactly the chip height, not 46: the extra 8dp was slack inside the
+        // strip that landed below the chips, so the gap to the control row
+        // read as double the gap above the strip.
+        addView(actionScroll, lp(MATCH, dp(38)).also { it.bottomMargin = rowGap })
 
         // --- control row --------------------------------------------------
         controls = LinearLayout(context).apply {
@@ -155,10 +179,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         micButton = TextView(context).apply {
             text = "Hold to talk"
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(c.onAccent)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            background = roundedDrawable(ACCENT, dp(14).toFloat())
+            background = roundedDrawable(c.accent, dp(14).toFloat())
             isClickable = true
             // Doubles as the setup prompt when the keyboard is not yet
             // usable, so tapping it opens settings rather than the mic.
@@ -196,10 +220,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 // Only the mic changes. Space, newline, backspace and the
                 // globe all work without a key, so taking them away would
                 // strand someone mid-sentence in another app.
-                setStatus(state.reason, FG_DIM)
+                setStatus(state.reason, c.fgDim)
                 waveform.visibility = GONE
                 micButton.text = "Set up Tyvo to use"
-                micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
+                micButton.background = roundedDrawable(c.accent, dp(14).toFloat())
                 micIsSetupPrompt = true
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
@@ -208,11 +232,11 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Idle -> {
-                setStatus(state.lastError, WARN)
+                setStatus(state.lastError, c.warn)
                 waveform.visibility = GONE
                 micIsSetupPrompt = false
                 micButton.text = "Speak"
-                micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
+                micButton.background = roundedDrawable(c.accent, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
                 customRow.visibility = GONE
@@ -220,10 +244,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Recording -> {
-                setStatus("Listening   ${fmt(state.elapsedMs)}", REC)
+                setStatus("Listening   ${fmt(state.elapsedMs)}", c.rec)
                 waveform.visibility = VISIBLE
                 micButton.text = "Done"
-                micButton.background = roundedDrawable(REC, dp(14).toFloat())
+                micButton.background = roundedDrawable(c.rec, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
                 customRow.visibility = GONE
@@ -231,10 +255,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Working -> {
-                setStatus("${state.step}…", FG_DIM)
+                setStatus("${state.step}…", c.fgDim)
                 waveform.visibility = GONE
                 micButton.text = "…"
-                micButton.background = roundedDrawable(ACCENT_DIM, dp(14).toFloat())
+                micButton.background = roundedDrawable(c.accentDim, dp(14).toFloat())
                 undoButton.visibility = GONE
                 doneButton.visibility = GONE
                 customRow.visibility = GONE
@@ -245,11 +269,11 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 // No preview of the text: it is already in the field.
                 setStatus(
                     state.note?.let { if (state.busy) "$it…" else it },
-                    if (state.busy) FG_DIM else WARN,
+                    if (state.busy) c.fgDim else c.warn,
                 )
                 waveform.visibility = GONE
                 micButton.text = "Speak"
-                micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
+                micButton.background = roundedDrawable(c.accent, dp(14).toFloat())
                 undoButton.visibility = if (state.canUndo) VISIBLE else GONE
                 doneButton.visibility = VISIBLE
                 customRow.visibility = VISIBLE
@@ -326,14 +350,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             gravity = Gravity.CENTER
             setTextColor(
                 when {
-                    selected -> Color.WHITE
-                    enabled -> FG
-                    else -> FG_FAINT
+                    selected -> c.onAccent
+                    enabled -> c.fg
+                    else -> c.fgFaint
                 }
             )
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(dp(14), 0, dp(14), 0)
-            background = roundedDrawable(if (selected) ACCENT else SURFACE, dp(11).toFloat())
+            background = roundedDrawable(if (selected) c.accent else c.surface, dp(11).toFloat())
             isClickable = enabled
             alpha = if (enabled) 1f else 0.55f
             setOnClickListener { if (enabled) onTap() }
@@ -345,10 +369,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         TextView(context).apply {
             text = label
             gravity = Gravity.CENTER
-            setTextColor(if (accent) Color.WHITE else FG)
+            setTextColor(if (accent) c.onAccent else c.fg)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setPadding(dp(14), 0, dp(14), 0)
-            background = roundedDrawable(if (accent) ACCENT else SURFACE, dp(13).toFloat())
+            background = roundedDrawable(if (accent) c.accent else c.surface, dp(13).toFloat())
             isClickable = true
             setOnClickListener { onTap() }
         }
@@ -367,9 +391,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         TextView(context).apply {
             text = label
             gravity = Gravity.CENTER
-            setTextColor(FG)
+            setTextColor(c.fg)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            background = roundedDrawable(SURFACE, dp(13).toFloat())
+            background = roundedDrawable(c.surface, dp(13).toFloat())
             isClickable = true
 
             var repeats = 0
@@ -430,17 +454,36 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
 
-        val BG = Color.parseColor("#16181D")
-        val SURFACE = Color.parseColor("#262A32")
-        val FG = Color.parseColor("#E8EAED")
-        val FG_DIM = Color.parseColor("#A8AEBB")
-        val FG_FAINT = Color.parseColor("#6B7280")
-        val ACCENT = Color.parseColor("#4C7DF0")
-        val ACCENT_DIM = Color.parseColor("#33507F")
-        val REC = Color.parseColor("#E5484D")
-        val WARN = Color.parseColor("#F5A524")
+        // Two palettes, picked from the device's night-mode setting. A
+        // keyboard sits against whatever app is showing, so a dark bar under
+        // a light chat window is the one piece of chrome that cannot be
+        // ignored.
+        private val DARK = Palette(
+            bg = Color.parseColor("#16181D"),
+            surface = Color.parseColor("#262A32"),
+            fg = Color.parseColor("#E8EAED"),
+            fgDim = Color.parseColor("#A8AEBB"),
+            fgFaint = Color.parseColor("#6B7280"),
+            accent = Color.parseColor("#4C7DF0"),
+            accentDim = Color.parseColor("#33507F"),
+            rec = Color.parseColor("#E5484D"),
+            warn = Color.parseColor("#F5A524"),
+            onAccent = Color.WHITE,
+        )
 
-        /** Long enough that a tap is never mistaken for a hold. */
+        private val LIGHT = Palette(
+            bg = Color.parseColor("#ECEEF2"),
+            surface = Color.parseColor("#FFFFFF"),
+            fg = Color.parseColor("#1B1D22"),
+            fgDim = Color.parseColor("#5A6070"),
+            fgFaint = Color.parseColor("#9AA1B0"),
+            accent = Color.parseColor("#3A63D0"),
+            accentDim = Color.parseColor("#A9BCEC"),
+            rec = Color.parseColor("#C9343A"),
+            warn = Color.parseColor("#9A6200"),
+            onAccent = Color.WHITE,
+        )
+
         const val FIRST_REPEAT_DELAY_MS = 400L
         const val CHAR_REPEAT_MS = 55L
         /** Roughly a second of characters before escalating to words. */
