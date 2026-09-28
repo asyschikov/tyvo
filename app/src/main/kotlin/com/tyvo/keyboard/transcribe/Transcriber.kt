@@ -243,7 +243,7 @@ class Transcriber(
         const val DEFAULT_MISTRAL_MODEL = "voxtral-mini-latest"
 
         const val DEFAULT_XAI_MODEL = "grok-voice-transcribe-2.0"
-        const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+        const val DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
         /** Gemini's documented cap on inline (base64) request data. */
         const val GEMINI_INLINE_LIMIT = 20 * 1024 * 1024
