@@ -20,7 +20,6 @@ package com.tyvo.keyboard
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,13 +61,13 @@ class ProviderDefaultsTest {
     }
 
     @Test
-    fun `providers built from docs alone are marked unverified`() {
-        // The flag drives a warning in settings. It must stay false until
-        // someone has actually dictated through them.
-        assertTrue("OpenAI was verified against the live API", Provider.OPENAI.verified)
-        assertTrue("Mistral was verified against the live API", Provider.MISTRAL.verified)
-        // Gemini's two stages were run against a live key on 2026-09-29.
-        assertTrue("Gemini was verified against the live API", Provider.GEMINI.verified)
-        assertFalse("xAI has not been run against the live API", Provider.XAI.verified)
+    fun `every shipped provider has been run against its live API`() {
+        // The flag drives a warning in settings, and exists so a provider
+        // added from docs alone cannot ship silently. All four have now had
+        // both stages exercised against real keys, so all four are true --
+        // anything new starts false until someone actually dictates with it.
+        Provider.entries.forEach {
+            assertTrue("${it.label} has not been run against the live API", it.verified)
+        }
     }
 }
