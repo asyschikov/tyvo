@@ -27,6 +27,8 @@ import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -50,6 +52,7 @@ import com.tyvo.keyboard.data.Settings
  * language, retention -- has a sensible default and belongs in settings,
  * where it can be found once the thing is actually working.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
     val ctx = LocalContext.current
@@ -115,7 +118,14 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Wrapping, not a Row: four chips including "Google Gemini" do not
+            // fit on one line, and a plain Row overflows rather than wrapping,
+            // leaving a tall band of empty space below the squeezed chips.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Provider.entries.forEach { p ->
                     FilterChip(
                         selected = provider == p,
@@ -163,16 +173,23 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
+            // Stacked, not side by side: they are two sequential steps, and
+            // on a narrow screen the pair wrapped awkwardly.
+            OutlinedButton(
+                onClick = {
                     ctx.startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
-                }) { Text(if (imeEnabled) "Keyboard settings" else "Enable Tyvo") }
-                if (imeEnabled) {
-                    OutlinedButton(onClick = {
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (imeEnabled) "Keyboard settings" else "Enable Tyvo") }
+
+            if (imeEnabled) {
+                OutlinedButton(
+                    onClick = {
                         (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                             .showInputMethodPicker()
-                    }) { Text("Switch to Tyvo") }
-                }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Switch to Tyvo") }
             }
         }
 

@@ -73,7 +73,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private val customInput: EditText
     private val customRow: LinearLayout
     private val controls: LinearLayout
-    private val setupButton: TextView
+
+    /** True while the mic button is standing in as the setup prompt. */
+    private var micIsSetupPrompt = false
 
     init {
         orientation = VERTICAL
@@ -134,20 +136,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         }
         addView(actionScroll, lp(MATCH, dp(46)).also { it.bottomMargin = dp(8) })
 
-        // --- setup prompt, shown instead of the controls until usable ------
-        setupButton = TextView(context).apply {
-            text = "Set up Tyvo to use"
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            background = roundedDrawable(ACCENT, dp(14).toFloat())
-            isClickable = true
-            visibility = GONE
-            setOnClickListener { onOpenSettings() }
-        }
-        addView(setupButton, lp(MATCH, dp(56)))
-
         // --- control row --------------------------------------------------
         controls = LinearLayout(context).apply {
             orientation = HORIZONTAL
@@ -168,7 +156,11 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             background = roundedDrawable(ACCENT, dp(14).toFloat())
             isClickable = true
-            setOnClickListener { onMicPressed() }
+            // Doubles as the setup prompt when the keyboard is not yet
+            // usable, so tapping it opens settings rather than the mic.
+            setOnClickListener {
+                if (micIsSetupPrompt) onOpenSettings() else onMicPressed()
+            }
         }
         controls.addView(micButton, LayoutParams(0, dp(56), 1f).also {
             it.leftMargin = dp(6); it.rightMargin = dp(6)
@@ -197,20 +189,24 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     fun render(state: UiState) {
         when (state) {
             is UiState.NeedsSetup -> {
-                // One button, no keyboard. A disabled mic explains nothing.
+                // Only the mic changes. Space, newline, backspace and the
+                // globe all work without a key, so taking them away would
+                // strand someone mid-sentence in another app.
                 setStatus(state.reason, FG_DIM)
                 waveform.visibility = GONE
-                controls.visibility = GONE
+                micButton.text = "Set up Tyvo to use"
+                micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
+                micIsSetupPrompt = true
+                undoButton.visibility = GONE
+                doneButton.visibility = GONE
                 customRow.visibility = GONE
-                actionStrip.removeAllViews()
-                setupButton.visibility = VISIBLE
+                showIdleActions(canRetry = false)
             }
 
             is UiState.Idle -> {
                 setStatus(state.lastError, WARN)
                 waveform.visibility = GONE
-                controls.visibility = VISIBLE
-                setupButton.visibility = GONE
+                micIsSetupPrompt = false
                 micButton.text = "Speak"
                 micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -222,8 +218,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             is UiState.Recording -> {
                 setStatus("Listening   ${fmt(state.elapsedMs)}", REC)
                 waveform.visibility = VISIBLE
-                controls.visibility = VISIBLE
-                setupButton.visibility = GONE
                 micButton.text = "Done"
                 micButton.background = roundedDrawable(REC, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -235,8 +229,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             is UiState.Working -> {
                 setStatus("${state.step}…", FG_DIM)
                 waveform.visibility = GONE
-                controls.visibility = VISIBLE
-                setupButton.visibility = GONE
                 micButton.text = "…"
                 micButton.background = roundedDrawable(ACCENT_DIM, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -252,8 +244,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                     if (state.busy) FG_DIM else WARN,
                 )
                 waveform.visibility = GONE
-                controls.visibility = VISIBLE
-                setupButton.visibility = GONE
                 micButton.text = "Speak"
                 micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
                 undoButton.visibility = if (state.canUndo) VISIBLE else GONE
