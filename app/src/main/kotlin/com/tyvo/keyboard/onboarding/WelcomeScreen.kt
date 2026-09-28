@@ -91,18 +91,16 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
         )
 
         Text(
-            "Speak into any text field and Tyvo writes what you meant, not " +
-                "what you said. It applies corrections you make out loud, drops " +
-                "the ums, and punctuates.",
+            "Speak into any text field. Tyvo writes what you meant, not what " +
+                "you said.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
         ExampleCard()
 
         Text(
-            "Then you can reshape it without retyping: shorter, more formal, " +
-                "as a list, as an email — or tell it what you want in your own " +
-                "words. Every change is one tap to undo.",
+            "Then reshape it in one tap: shorter, formal, a list. Undo is " +
+                "always one tap back.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
@@ -113,9 +111,7 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
         // --- 1. key ------------------------------------------------------
         StepCard(number = 1, title = "Add an API key", done = apiKey.isNotBlank()) {
             Text(
-                "Tyvo uses your own account, so you pay the provider directly " +
-                    "and nothing goes through us. One key covers both " +
-                    "transcription and clean-up.",
+                "Your own account, billed per use. One key covers both stages.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -148,8 +144,7 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
         // --- 2. microphone ------------------------------------------------
         StepCard(number = 2, title = "Allow the microphone", done = micGranted) {
             Text(
-                "Audio is sent to ${provider.label} to be transcribed and is " +
-                    "never stored anywhere else.",
+                "Audio goes to ${provider.label} and nowhere else.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -163,8 +158,8 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
         // --- 3. enable the keyboard ---------------------------------------
         StepCard(number = 3, title = "Turn Tyvo on", done = imeEnabled) {
             Text(
-                "Android needs you to enable Tyvo in its keyboard settings, " +
-                    "then pick it with the globe key while typing.",
+                "Enable it in Android's keyboard settings, then pick it with " +
+                    "the globe key.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
