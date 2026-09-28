@@ -137,7 +137,6 @@ class TyvoInputMethodService : InputMethodService() {
         v.onSpace = { commitLiteral(" ") }
         v.onCustomInstruction = { runCustom(it) }
         view = v
-        applyNavigationBarAppearance()
         render(UiState.Idle())
         return v
     }
@@ -154,15 +153,29 @@ class TyvoInputMethodService : InputMethodService() {
         val night = resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
         val w = window?.window ?: return
-        WindowInsetsControllerCompat(w, w.decorView).apply {
-            // "Light navigation bars" means a light *background*, so the
-            // icons are drawn dark. That is what we want in the light theme.
-            isAppearanceLightNavigationBars = !night
-        }
+        val decor = w.decorView
+
         // Match the keyboard's own background so the row reads as part of it
-        // rather than a separate band underneath.
+        // rather than a band beneath it.
         @Suppress("DEPRECATION")
         w.navigationBarColor = if (night) KeyboardColors.BG_DARK else KeyboardColors.BG_LIGHT
+
+        // "Light navigation bars" describes the *background*, so the system
+        // draws its icons dark -- which is what the light theme needs.
+        WindowInsetsControllerCompat(w, decor).isAppearanceLightNavigationBars = !night
+
+        // The compat controller does not always take on an IME window, so set
+        // the legacy flag too. They agree, so whichever wins is correct.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            @Suppress("DEPRECATION")
+            decor.systemUiVisibility =
+                if (night) {
+                    decor.systemUiVisibility and
+                        View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
+                } else {
+                    decor.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                }
+        }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -185,6 +198,10 @@ class TyvoInputMethodService : InputMethodService() {
      */
     override fun onWindowShown() {
         super.onWindowShown()
+        // Every time the window appears, not once at creation: the window is
+        // not attached yet in onCreateInputView, and the theme can change
+        // between one showing and the next.
+        applyNavigationBarAppearance()
         // Only while idle: re-rendering mid-session would throw away a review
         // the user is still working with.
         if (!session.isActive && pipeline?.isActive != true) {
