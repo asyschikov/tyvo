@@ -112,9 +112,6 @@ Offered on the review strip after dictation, each one re-editable and undoable:
 **Tone** — Formal · Casual · Warmer · Direct
 **Length** — Shorter · Expand · Bullets
 
-Plus a free-text box: type any instruction ("make it sound less annoyed",
-"turn this into a Jira ticket") and it applies to the current text.
-
 ### How actions compose
 
 Every action transforms the **base** text, never the previous action's output.

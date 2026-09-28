@@ -69,22 +69,8 @@ class TyvoInputMethodService : InputMethodService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private companion object {
-        /** Marks a variant produced by a typed instruction rather than a chip. */
-        const val CUSTOM_ACTION_ID = "__custom__"
-
         /** How far back to look when deleting a word. */
         const val WORD_LOOKBEHIND = 96
-
-        /**
-         * Substrings that mark a typed instruction as a translation request,
-         * in the languages most likely to be dictated here.
-         */
-        val TRANSLATION_HINTS = listOf(
-            "translat", "in english", "to english", "in german", "to german",
-            "in french", "to french", "in spanish", "to spanish",
-            "in russian", "to russian", "перевед", "перевод", "по-английски",
-            "на английский", "на русский", "übersetz", "traduis", "traduce",
-        )
     }
 
     private lateinit var settings: Settings
@@ -135,7 +121,6 @@ class TyvoInputMethodService : InputMethodService() {
         v.onBackspace = { byWord -> backspace(byWord) }
         v.onNewline = { commitLiteral("\n") }
         v.onSpace = { commitLiteral(" ") }
-        v.onCustomInstruction = { runCustom(it) }
         view = v
         render(UiState.Idle())
         return v
@@ -407,22 +392,6 @@ class TyvoInputMethodService : InputMethodService() {
 
     private fun runAction(action: QuickAction) =
         runInstruction(action.instruction, action.label, action.id, action.translating)
-
-    private fun runCustom(instruction: String) =
-        // A typed instruction may legitimately ask for a translation, so the
-        // language lock is relaxed only when the user actually said so.
-        runInstruction(
-            instruction,
-            "Rewriting",
-            CUSTOM_ACTION_ID,
-            translating = looksLikeTranslation(instruction),
-        )
-
-    /** Whether a typed instruction is asking for a language change. */
-    private fun looksLikeTranslation(instruction: String): Boolean {
-        val s = instruction.lowercase()
-        return TRANSLATION_HINTS.any { it in s }
-    }
 
     /**
      * Applies an instruction to the session's base text.
