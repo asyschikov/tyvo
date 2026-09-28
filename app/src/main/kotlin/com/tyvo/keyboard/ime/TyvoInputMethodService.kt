@@ -146,7 +146,23 @@ class TyvoInputMethodService : InputMethodService() {
             committed = ""
         }
         render(stateForIdle())
-        view?.setMicEnabled(hasMicPermission())
+    }
+
+    /**
+     * Re-checks setup whenever the keyboard comes back up.
+     *
+     * Tapping "Set up Tyvo" opens the app over the keyboard, and coming back
+     * does not always restart input on the same field -- so without this, a
+     * user who just pasted their key would return to the setup button still
+     * telling them to paste their key.
+     */
+    override fun onWindowShown() {
+        super.onWindowShown()
+        // Only while idle: re-rendering mid-session would throw away a review
+        // the user is still working with.
+        if (!session.isActive && pipeline?.isActive != true) {
+            render(stateForIdle())
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -167,14 +183,11 @@ class TyvoInputMethodService : InputMethodService() {
     }
 
     private fun startRecording() {
-        if (!hasMicPermission()) {
-            render(UiState.Idle("Grant microphone access in Tyvo settings."))
-            openSettings()
-            return
-        }
-        if (!hasTranscribeKey()) {
-            render(UiState.Idle("Add an API key in Tyvo settings."))
-            openSettings()
+        // Should be unreachable -- an unconfigured keyboard shows the setup
+        // button instead of the mic -- but a stale view must not start a
+        // recording that cannot go anywhere.
+        setupNeeded()?.let {
+            render(UiState.NeedsSetup(it))
             return
         }
 
@@ -642,9 +655,24 @@ class TyvoInputMethodService : InputMethodService() {
             UiState.Idle(note ?: "Text is no longer editable here.")
         }
 
-    private fun stateForIdle(): UiState =
-        if (session.isActive) reviewOrIdle()
-        else UiState.Idle(canRetry = lastFailedId != null)
+    private fun stateForIdle(): UiState = when {
+        setupNeeded() != null -> UiState.NeedsSetup(setupNeeded()!!)
+        session.isActive -> reviewOrIdle()
+        else -> UiState.Idle(canRetry = lastFailedId != null)
+    }
+
+    /**
+     * What is stopping the keyboard from working, or null if nothing is.
+     *
+     * Checked every time the keyboard is shown rather than once at startup:
+     * the user can grant permission or paste a key while the keyboard is
+     * alive, and it should notice on the way back.
+     */
+    private fun setupNeeded(): String? = when {
+        !hasTranscribeKey() -> "Tyvo needs an API key before it can hear you."
+        !hasMicPermission() -> "Tyvo needs permission to use the microphone."
+        else -> null
+    }
 
     private fun render(state: UiState) {
         view?.render(state)

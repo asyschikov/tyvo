@@ -72,8 +72,8 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private val doneButton: TextView
     private val customInput: EditText
     private val customRow: LinearLayout
-
-    private var micEnabled = true
+    private val controls: LinearLayout
+    private val setupButton: TextView
 
     init {
         orientation = VERTICAL
@@ -134,8 +134,22 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         }
         addView(actionScroll, lp(MATCH, dp(46)).also { it.bottomMargin = dp(8) })
 
+        // --- setup prompt, shown instead of the controls until usable ------
+        setupButton = TextView(context).apply {
+            text = "Set up Tyvo to use"
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            background = roundedDrawable(ACCENT, dp(14).toFloat())
+            isClickable = true
+            visibility = GONE
+            setOnClickListener { onOpenSettings() }
+        }
+        addView(setupButton, lp(MATCH, dp(56)))
+
         // --- control row --------------------------------------------------
-        val controls = LinearLayout(context).apply {
+        controls = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -154,7 +168,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             background = roundedDrawable(ACCENT, dp(14).toFloat())
             isClickable = true
-            setOnClickListener { if (micEnabled) onMicPressed() }
+            setOnClickListener { onMicPressed() }
         }
         controls.addView(micButton, LayoutParams(0, dp(56), 1f).also {
             it.leftMargin = dp(6); it.rightMargin = dp(6)
@@ -169,20 +183,34 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         addView(controls, lp(MATCH, WRAP))
     }
 
-    fun setMicEnabled(enabled: Boolean) {
-        micEnabled = enabled
-        micButton.alpha = if (enabled) 1f else 0.5f
-    }
 
     fun setAmplitude(a: Float) = waveform.push(a)
 
-    /** Rebuilds the surface for [state]. */
+    /**
+     * Rebuilds the surface for [state].
+     *
+     * The status line carries only things the field cannot: a timer, progress,
+     * an error. It is hidden the rest of the time -- the dictated text is
+     * already in front of the user, in the field they are typing into, and
+     * repeating it on the keyboard is clutter.
+     */
     fun render(state: UiState) {
         when (state) {
-            is UiState.Idle -> {
-                status.text = state.lastError ?: "Tap the mic and speak."
-                status.setTextColor(if (state.lastError != null) WARN else FG_DIM)
+            is UiState.NeedsSetup -> {
+                // One button, no keyboard. A disabled mic explains nothing.
+                setStatus(state.reason, FG_DIM)
                 waveform.visibility = GONE
+                controls.visibility = GONE
+                customRow.visibility = GONE
+                actionStrip.removeAllViews()
+                setupButton.visibility = VISIBLE
+            }
+
+            is UiState.Idle -> {
+                setStatus(state.lastError, WARN)
+                waveform.visibility = GONE
+                controls.visibility = VISIBLE
+                setupButton.visibility = GONE
                 micButton.text = "Speak"
                 micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -192,9 +220,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Recording -> {
-                status.text = "Listening   ${fmt(state.elapsedMs)}"
-                status.setTextColor(REC)
+                setStatus("Listening   ${fmt(state.elapsedMs)}", REC)
                 waveform.visibility = VISIBLE
+                controls.visibility = VISIBLE
+                setupButton.visibility = GONE
                 micButton.text = "Done"
                 micButton.background = roundedDrawable(REC, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -204,9 +233,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Working -> {
-                status.text = "${state.step}…"
-                status.setTextColor(FG_DIM)
+                setStatus("${state.step}…", FG_DIM)
                 waveform.visibility = GONE
+                controls.visibility = VISIBLE
+                setupButton.visibility = GONE
                 micButton.text = "…"
                 micButton.background = roundedDrawable(ACCENT_DIM, dp(14).toFloat())
                 undoButton.visibility = GONE
@@ -216,15 +246,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             }
 
             is UiState.Review -> {
-                status.text = when {
-                    state.note != null && state.busy -> "${state.note}…"
-                    state.note != null -> state.note
-                    else -> preview(state.text)
-                }
-                status.setTextColor(
-                    if (state.note != null && !state.busy) WARN else FG_DIM
+                // No preview of the text: it is already in the field.
+                setStatus(
+                    state.note?.let { if (state.busy) "$it…" else it },
+                    if (state.busy) FG_DIM else WARN,
                 )
                 waveform.visibility = GONE
+                controls.visibility = VISIBLE
+                setupButton.visibility = GONE
                 micButton.text = "Speak"
                 micButton.background = roundedDrawable(ACCENT, dp(14).toFloat())
                 undoButton.visibility = if (state.canUndo) VISIBLE else GONE
@@ -232,6 +261,17 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 customRow.visibility = VISIBLE
                 showReviewActions(state, enabled = !state.busy)
             }
+        }
+    }
+
+    /** Shows [text], or collapses the line entirely when there is nothing to say. */
+    private fun setStatus(text: String?, color: Int) {
+        if (text.isNullOrBlank()) {
+            status.visibility = GONE
+        } else {
+            status.visibility = VISIBLE
+            status.text = text
+            status.setTextColor(color)
         }
     }
 
