@@ -54,12 +54,17 @@ import com.tyvo.keyboard.data.Settings
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
+fun WelcomeScreen(
+    settings: Settings,
+    onDone: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val ctx = LocalContext.current
 
     var provider by remember { mutableStateOf(settings.provider) }
     var apiKey by remember(provider) { mutableStateOf(settings.key(provider)) }
     var showKey by remember { mutableStateOf(false) }
+    var tryText by remember { mutableStateOf("") }
 
     var micGranted by remember {
         mutableStateOf(
@@ -75,8 +80,6 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
     // enable the keyboard and comes back, and the row has to notice.
     var imeEnabled by remember { mutableStateOf(isImeEnabled(ctx)) }
     LaunchedEffect(Unit) { imeEnabled = isImeEnabled(ctx) }
-
-    val ready = micGranted && apiKey.isNotBlank()
 
     Column(
         Modifier
@@ -193,20 +196,38 @@ fun WelcomeScreen(settings: Settings, onDone: () -> Unit) {
             }
         }
 
+        // --- 4. try it ------------------------------------------------------
+        // A real text field rather than a "Start dictating" button, which
+        // could only ever close this screen -- it could not start anything,
+        // since dictation happens in whatever app you are actually typing in.
+        StepCard(number = 4, title = "Try it", done = tryText.isNotBlank()) {
+            Text(
+                "Switch to Tyvo with the globe key and hold the mic.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = tryText,
+                onValueChange = { tryText = it },
+                placeholder = { Text("Say something here") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+        }
+
         Spacer(Modifier.height(4.dp))
 
-        Button(
-            onClick = { settings.hasOnboarded = true; onDone() },
-            enabled = ready,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (ready) "Start dictating" else "Add a key to continue") }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = { settings.hasOnboarded = true; onOpenSettings() },
+                modifier = Modifier.weight(1f),
+            ) { Text("More settings") }
 
-        // An escape hatch, because someone may want to look around before
-        // committing a key -- but it does not mark onboarding complete.
-        TextButton(
-            onClick = onDone,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) { Text("Skip for now") }
+            Button(
+                onClick = { settings.hasOnboarded = true; onDone() },
+                modifier = Modifier.weight(1f),
+            ) { Text("Done") }
+        }
 
         Spacer(Modifier.height(16.dp))
     }

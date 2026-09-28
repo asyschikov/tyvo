@@ -70,6 +70,7 @@ import kotlinx.coroutines.launch
 import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
+import com.tyvo.keyboard.ui.FeedbackButton
 
 /** Which of the app's screens is showing. */
 private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE }
@@ -90,9 +91,14 @@ class SettingsActivity : ComponentActivity() {
         store = RecordingStore(this)
         Maintenance.runInBackground(store, settings)
 
+        // Captured before the composition: inside the Box below, `this`
+        // refers to BoxScope rather than the activity.
+        val activity = this
+
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize()) {
+                  Box(Modifier.fillMaxSize()) {
                     // History is home once the user is set up; the welcome
                     // flow only stands in front of it the first time.
                     var screen by remember {
@@ -110,6 +116,7 @@ class SettingsActivity : ComponentActivity() {
                         Screen.WELCOME -> WelcomeScreen(
                             settings = settings,
                             onDone = { screen = Screen.HISTORY },
+                            onOpenSettings = { screen = Screen.SETTINGS },
                         )
 
                         Screen.HISTORY -> HistoryRoute(
@@ -121,12 +128,12 @@ class SettingsActivity : ComponentActivity() {
 
                         Screen.SETTINGS -> SettingsScreen(
                             settings = settings,
-                            activity = this,
+                            activity = activity,
                             onBack = { screen = Screen.HISTORY },
                         )
 
                         Screen.USAGE -> {
-                            val usageStore = remember { UsageStore(this) }
+                            val usageStore = remember { UsageStore(activity) }
                             var rows by remember { mutableStateOf(usageStore.all()) }
                             UsageScreen(
                                 rows = rows,
@@ -139,6 +146,12 @@ class SettingsActivity : ComponentActivity() {
                     BackHandler(
                         enabled = screen == Screen.SETTINGS || screen == Screen.USAGE
                     ) { screen = Screen.HISTORY }
+
+                    // One button for the whole app rather than one per
+                    // screen: the moment someone has something to say is
+                    // rarely the moment they are looking at settings.
+                    FeedbackButton(settings)
+                  }
                 }
             }
         }
@@ -535,15 +548,6 @@ private fun SettingsScreen(
         Spacer(Modifier.height(72.dp))
     }
 
-    FloatingActionButton(
-        onClick = { sendFeedback(ctx, settings) },
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(20.dp),
-    ) {
-        Icon(Icons.Outlined.MailOutline, contentDescription = "Send feedback")
-    }
     }
 
     if (pickingLanguage) {
@@ -668,62 +672,6 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
     }
 }
 
-/**
- * Opens a pre-addressed draft in whatever mail app the user has.
- *
- * Pre-fills the setup details that make a bug report answerable -- app
- * version, Android version, device, provider and models -- because asking
- * for them afterwards costs a round trip. Nothing dictated is included: the
- * transcripts are the private part, and a feedback button is no place to
- * leak them.
- */
-private fun sendFeedback(ctx: Context, settings: Settings) {
-    val provider = settings.provider
-    val body = buildString {
-        append("\n\n\n---\n")
-        append("Tyvo ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
-        append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
-        append("${Build.MANUFACTURER} ${Build.MODEL}\n")
-        append("Provider: ${provider.label}\n")
-        append(
-            "Transcription: " +
-                settings.transcribeModel(provider)
-                    .ifBlank { Transcriber.defaultModelFor(provider) } + "\n"
-        )
-        append(
-            "Clean-up: " +
-                if (!settings.polishEnabled) "off"
-                else settings.polishModel(provider)
-                    .ifBlank { Polisher.defaultModelFor(provider) }
-        )
-    }
-
-    val intent = Intent(Intent.ACTION_SENDTO).apply {
-        // SENDTO with a mailto: URI reaches mail apps only, so the chooser
-        // is not cluttered with every app that accepts plain text.
-        data = Uri.parse("mailto:")
-        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_ADDRESS))
-        putExtra(Intent.EXTRA_SUBJECT, "Tyvo feedback")
-        putExtra(Intent.EXTRA_TEXT, body)
-    }
-
-    try {
-        ctx.startActivity(Intent.createChooser(intent, "Send feedback"))
-    } catch (e: android.content.ActivityNotFoundException) {
-        // No mail app: leave the address somewhere the user can use it.
-        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(
-            android.content.ClipData.newPlainText("Tyvo feedback address", FEEDBACK_ADDRESS)
-        )
-        Toast.makeText(
-            ctx,
-            "No mail app found. Address copied: $FEEDBACK_ADDRESS",
-            Toast.LENGTH_LONG,
-        ).show()
-    }
-}
-
-private const val FEEDBACK_ADDRESS = "asyschikov+tyvo@gmail.com"
 
 @Composable
 private fun ToggleRow(
