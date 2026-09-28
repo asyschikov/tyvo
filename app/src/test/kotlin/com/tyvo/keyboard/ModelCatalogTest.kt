@@ -47,11 +47,12 @@ class ModelCatalogTest {
     }
 
     @Test
-    fun `no transcription list offers a model that cannot transcribe`() {
-        // voxtral-small is rejected outright by the API as an invalid model.
+    fun `mistral transcription only offers voxtral mini models`() {
         ModelCatalog.MISTRAL_TRANSCRIBE.forEach {
-            assertFalse("voxtral-small cannot transcribe", it.id.contains("small"))
-            assertFalse("tts models cannot transcribe", it.id.contains("tts"))
+            assertTrue(
+                "${it.id} is not a voxtral-mini model",
+                it.id.startsWith("voxtral-mini"),
+            )
         }
     }
 

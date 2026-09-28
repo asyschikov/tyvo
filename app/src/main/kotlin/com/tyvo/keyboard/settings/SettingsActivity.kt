@@ -442,9 +442,10 @@ private fun SettingsScreen(
                     corrections.size > Correction.defaults.size
                 if (heavy) {
                     Text(
-                        "Extras crowd out the others on small models: measured " +
-                            "on Ministral 3B, spoken corrections go from always " +
-                            "applied to rarely.",
+                        "Extras crowd out the others on the smallest models: " +
+                            "measured on Ministral 3B, spoken corrections go " +
+                            "from always applied to rarely. Ministral 8B, the " +
+                            "default, handles all of them.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
