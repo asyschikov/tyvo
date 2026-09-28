@@ -229,7 +229,9 @@ fun WelcomeScreen(
             ) { Text("Done") }
         }
 
-        Spacer(Modifier.height(16.dp))
+        // Clears the floating feedback button, which would otherwise sit on
+        // top of the Done button.
+        Spacer(Modifier.height(72.dp))
     }
 }
 

@@ -81,7 +81,10 @@ fun UsageScreen(
 
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            // Extra room at the bottom to clear the floating feedback button.
+            contentPadding = PaddingValues(
+                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
