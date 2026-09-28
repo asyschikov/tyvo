@@ -121,14 +121,19 @@ Test key (Mistral): <paste a throwaway key here>
 
 Generate a key for this and revoke it after review.
 
-## Screenshots needed
+## Screenshots
 
-At least 2, 1080×1920 or similar. Worth capturing:
+In `screenshots/`, five at 1080×2424, which Play accepts as-is. Upload in
+filename order:
 
-1. The keyboard mid-dictation, waveform visible
-2. The review strip with the quick-action chips
-3. History
-4. The welcome screen
+1. **Keyboard, after a dictation** — polished text in the field with the
+   Undo clean-up / Re-clean / Proofread chips showing. The one that explains
+   the product.
+2. **Keyboard, idle** — Space, Newline, Settings and the Speak button.
+3. **History** — a few transcripts including one the model turned into a
+   numbered list.
+4. **Settings** — provider choice, masked key, model pickers.
+5. **Usage** — audio seconds and tokens per model.
 
-`adb exec-out screencap -p > shot.png` is enough — Play accepts plain
-screenshots.
+The surname in the chat header of 1 and 2 is pixelated. Everything else in
+them is intentional.
