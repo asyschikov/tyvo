@@ -39,6 +39,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -267,7 +269,10 @@ private fun SettingsScreen(
             )
         }
 
-        // ---- provider ----------------------------------------------------
+        // ---- provider, and everything belonging to it ----------------------
+        // One card rather than two: split across cards, the radio buttons and
+        // the key field they configure ended up about 60dp and a heading
+        // apart, which read as unrelated settings.
         SectionCard("AI provider") {
             Text(
                 "One key covers both transcription and clean-up.",
@@ -283,10 +288,7 @@ private fun SettingsScreen(
                     testResult = null
                 },
             )
-        }
 
-        // ---- everything for the selected provider -------------------------
-        SectionCard(provider.label) {
             if (!provider.verified) {
                 Text(
                     "Untested against the live API. OpenAI and Mistral are known " +
@@ -796,11 +798,25 @@ private fun <T> ChoiceRow(
 ) {
     Column {
         options.forEach { (value, label) ->
+            // The whole row is the target, so the radio can lose its own
+            // 48dp one and the rows sit closer together.
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = value == selected,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(value) },
+                    )
+                    .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RadioButton(selected = value == selected, onClick = { onSelect(value) })
+                RadioButton(
+                    selected = value == selected,
+                    onClick = null,
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.width(10.dp))
                 Text(label, style = MaterialTheme.typography.bodyMedium)
             }
         }
