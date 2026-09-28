@@ -34,6 +34,8 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
+import android.content.res.Configuration
+import androidx.core.view.WindowInsetsControllerCompat
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
@@ -43,6 +45,7 @@ import com.tyvo.keyboard.net.TyvoException
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.settings.SettingsActivity
 import com.tyvo.keyboard.transcribe.Transcriber
+import com.tyvo.keyboard.ui.KeyboardColors
 import com.tyvo.keyboard.ui.KeyboardView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,8 +137,32 @@ class TyvoInputMethodService : InputMethodService() {
         v.onSpace = { commitLiteral(" ") }
         v.onCustomInstruction = { runCustom(it) }
         view = v
+        applyNavigationBarAppearance()
         render(UiState.Idle())
         return v
+    }
+
+    /**
+     * Tells the system whether to draw its own keyboard-row icons -- the
+     * globe and the dismiss chevron below our controls -- dark or light.
+     *
+     * Android cannot infer this from our surface, so it defaults to light
+     * icons, which wash out against the light theme. This is the only handle
+     * we have on that row: the icons themselves belong to the system.
+     */
+    private fun applyNavigationBarAppearance() {
+        val night = resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        val w = window?.window ?: return
+        WindowInsetsControllerCompat(w, w.decorView).apply {
+            // "Light navigation bars" means a light *background*, so the
+            // icons are drawn dark. That is what we want in the light theme.
+            isAppearanceLightNavigationBars = !night
+        }
+        // Match the keyboard's own background so the row reads as part of it
+        // rather than a separate band underneath.
+        @Suppress("DEPRECATION")
+        w.navigationBarColor = if (night) KeyboardColors.BG_DARK else KeyboardColors.BG_LIGHT
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {

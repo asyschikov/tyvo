@@ -46,6 +46,15 @@ import com.tyvo.keyboard.ime.UiState
  * the control row with the mic. Built in code rather than XML so the whole
  * layout stays readable in one place.
  */
+/**
+ * The keyboard's background in each theme, public so the IME can tint the
+ * system's own key row to match.
+ */
+object KeyboardColors {
+    val BG_DARK: Int = Color.parseColor("#16181D")
+    val BG_LIGHT: Int = Color.parseColor("#ECEEF2")
+}
+
 /** The colours the keyboard draws with, in one theme. */
 private data class Palette(
     val bg: Int,
