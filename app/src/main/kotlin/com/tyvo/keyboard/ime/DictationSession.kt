@@ -22,6 +22,15 @@ package com.tyvo.keyboard.ime
  */
 sealed interface UiState {
     /**
+     * Not usable yet: no API key, or no microphone permission.
+     *
+     * Its own state rather than a disabled button, because a greyed-out mic
+     * tells the user nothing about why it is grey or what to do about it.
+     * [reason] says what is missing.
+     */
+    data class NeedsSetup(val reason: String) : UiState
+
+    /**
      * Ready, nothing in flight. [lastError] shows a dismissed-on-next-action
      * note, and [canRetry] offers another go at a recording that failed.
      */
