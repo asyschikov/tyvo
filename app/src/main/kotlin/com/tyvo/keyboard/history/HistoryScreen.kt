@@ -94,10 +94,10 @@ fun HistoryScreen(
 
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            // Extra room at the bottom so the last card's buttons are not
-            // sitting under the floating feedback button.
+            // 120dp: the button is 56dp, sits 20dp from the edge, and clears
+            // the gesture inset -- 88dp left its Delete still underneath.
             contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp,
+                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
