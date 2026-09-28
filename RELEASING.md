@@ -28,18 +28,24 @@ OS keychain. Once per machine:
 secretspec config global init --provider keyring --profile default
 ```
 
-Then store the secrets. The keystore *file itself* goes in, not just a path to
-it — so the `.jks` never has to sit in the working tree:
+Then store the secrets. Give `set` no value and it prompts, which keeps the
+password out of your shell history:
+
+```sh
+secretspec set TYVO_KEYSTORE_PASSWORD   # prompts
+secretspec set TYVO_KEY_PASSWORD        # prompts
+```
+
+The keystore *file itself* goes in too, not just a path to it, so the `.jks`
+never has to sit in the working tree:
 
 ```sh
 secretspec set TYVO_KEYSTORE_PATH --from-file ~/keys/tyvo-upload.jks
-printf '%s' 'your-keystore-password' | secretspec set TYVO_KEYSTORE_PASSWORD --from-file -
-printf '%s' 'your-key-password'      | secretspec set TYVO_KEY_PASSWORD --from-file -
-printf '%s' 'tyvo'                   | secretspec set TYVO_KEY_ALIAS --from-file -
 ```
 
-Use `printf '%s' | ... --from-file -`, not a here-string: `<<<` appends a
-newline and it gets stored as part of the password.
+If you ever need to script it, pipe with `printf '%s' | secretspec set NAME
+--from-file -`. Not a here-string: `<<<` appends a newline and it is stored as
+part of the password.
 
 At build time `as_path` decodes the keystore to a temp file and hands Gradle
 its path. The path is different on every run, so nothing can cache it.
