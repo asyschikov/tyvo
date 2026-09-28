@@ -41,7 +41,7 @@ enum class Provider(
     MISTRAL("Mistral"),
     OPENAI("OpenAI"),
     XAI("xAI (Grok)", verified = false),
-    GEMINI("Google Gemini", verified = false);
+    GEMINI("Google Gemini");
 }
 
 /**

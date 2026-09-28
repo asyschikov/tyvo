@@ -67,7 +67,8 @@ class ProviderDefaultsTest {
         // someone has actually dictated through them.
         assertTrue("OpenAI was verified against the live API", Provider.OPENAI.verified)
         assertTrue("Mistral was verified against the live API", Provider.MISTRAL.verified)
+        // Gemini's two stages were run against a live key on 2026-09-29.
+        assertTrue("Gemini was verified against the live API", Provider.GEMINI.verified)
         assertFalse("xAI has not been run against the live API", Provider.XAI.verified)
-        assertFalse("Gemini has not been run against the live API", Provider.GEMINI.verified)
     }
 }

@@ -136,25 +136,38 @@ object ModelCatalog {
     )
 
     val XAI_POLISH = listOf(
-        ModelOption("grok-build-0.1", "Grok Build", "Fast and capable at short rewrites."),
+        ModelOption("grok-4.7", "Grok 4.7", "xAI's flagship; what their docs point at for chat."),
     )
 
+    // Gemini 2.5 is closed to new API keys: it still appears in the models
+    // list, but generateContent answers 404 "no longer available to new
+    // users". Everything here is 3.x, which is what a key made today can call.
     val GEMINI_TRANSCRIBE = listOf(
         ModelOption(
-            "gemini-2.5-flash-lite",
-            "Gemini Flash Lite",
+            "gemini-3.5-flash-lite",
+            "Gemini 3.5 Flash Lite",
             "Cheapest option. Audio is billed as tokens.",
         ),
         ModelOption(
-            "gemini-2.5-flash",
-            "Gemini Flash",
+            "gemini-3.5-flash",
+            "Gemini 3.5 Flash",
             "More accurate on noisy or accented speech.",
+        ),
+        ModelOption(
+            "gemini-flash-lite-latest",
+            "Gemini Flash Lite (latest)",
+            "Tracks whichever Flash Lite is current.",
         ),
     )
 
     val GEMINI_POLISH = listOf(
-        ModelOption("gemini-2.5-flash-lite", "Gemini Flash Lite", "Fastest and cheapest."),
-        ModelOption("gemini-2.5-flash", "Gemini Flash", "Better at awkward corrections."),
+        ModelOption("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "Fastest and cheapest."),
+        ModelOption("gemini-3.5-flash", "Gemini 3.5 Flash", "Better at awkward corrections."),
+        ModelOption(
+            "gemini-flash-lite-latest",
+            "Gemini Flash Lite (latest)",
+            "Tracks whichever Flash Lite is current.",
+        ),
     )
 
     fun transcribeFor(p: Provider): List<ModelOption> = when (p) {

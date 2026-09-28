@@ -116,10 +116,28 @@ To test:
 4. Open any app with a text field, switch to Tyvo with the globe key, and
    hold the mic button while speaking.
 
-Test key (Mistral): <paste a throwaway key here>
+Test key (Mistral): <paste the throwaway key here, in the Play Console only>
 ```
 
-Generate a key for this and revoke it after review.
+The key goes in the Play Console textarea, never in this file — this repo is
+public, and a key committed here is a key published. Generate a throwaway one
+at console.mistral.ai, paste it straight into the console, and revoke it once
+review passes.
+
+Verify it before submitting: a key that 403s on transcription gets the app
+rejected as non-functional, and Mistral gates some models by account tier.
+
+```sh
+curl -sf https://api.mistral.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $KEY" \
+  -F file=@clip.m4a -F model=voxtral-mini-latest
+
+curl -sf https://api.mistral.ai/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"ministral-8b-latest","messages":[{"role":"user","content":"hi"}]}'
+```
+
+Both must return 200 — the reviewer exercises both stages.
 
 ## Screenshots
 
