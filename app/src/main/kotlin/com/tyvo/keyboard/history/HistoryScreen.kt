@@ -94,7 +94,11 @@ fun HistoryScreen(
 
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            // Extra room at the bottom so the last card's buttons are not
+            // sitting under the floating feedback button.
+            contentPadding = PaddingValues(
+                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (attention > 0) {
