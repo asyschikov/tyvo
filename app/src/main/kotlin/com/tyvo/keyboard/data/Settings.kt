@@ -35,8 +35,11 @@ enum class Provider(
     /** False until someone has actually dictated through it end to end. */
     val verified: Boolean = true,
 ) {
-    OPENAI("OpenAI"),
+    // Declaration order is display order: every provider list renders from
+    // Provider.entries, so Mistral leads because it is the default and the
+    // best-tested. Persistence is by name, so reordering is safe.
     MISTRAL("Mistral"),
+    OPENAI("OpenAI"),
     XAI("xAI (Grok)", verified = false),
     GEMINI("Google Gemini", verified = false);
 }
