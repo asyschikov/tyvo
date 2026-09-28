@@ -67,7 +67,7 @@ single API key.
 
 | Provider | Transcription | Clean-up | Tested |
 |---|---|---|---|
-| **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-3b-latest` | ✅ |
+| **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-8b-latest` | ✅ |
 | OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
 | xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-build-0.1` | ⚠️ untested |
 | Google Gemini | `gemini-2.5-flash-lite` | `gemini-2.5-flash-lite` | ⚠️ untested |
@@ -101,8 +101,8 @@ one and back does not cost you a key you already pasted in.
 
 Note on model names: of the Voxtral family, only `voxtral-mini-*` reports
 `audio_transcription` capability. `voxtral-small-latest` does **not**
-transcribe despite the name, so overriding the Mistral model carelessly will
-break dictation. A unit test guards the default.
+transcribe despite the name — the API rejects it outright — so overriding the
+Mistral model carelessly will break dictation. Unit tests pin the defaults.
 
 ## Quick actions
 
@@ -232,12 +232,18 @@ Disabled ones are left out of the prompt entirely rather than negated — a
 prompt full of "do not do X" reads to a small model as a list of things worth
 considering.
 
-**The optional ones cost accuracy.** Measured on `ministral-3b`: the
-spoken-correction case passes 3/3 with the five defaults, 1/3 with seven
-corrections, and 0/3 with all eight. Longer instruction lists crowd out the
-earlier items, so the self-correction rule sits above the list rather than in
-it, and settings warns you when you switch extras on. On a larger model the
-ceiling is higher.
+**The optional ones cost accuracy on small models.** Measured on the
+spoken-correction case:
+
+| Model | 5 defaults | all 8 |
+|---|---|---|
+| `ministral-3b` | 3/3 | **0/3** |
+| `ministral-8b` *(default)* | 3/3 | **3/3** |
+
+Longer instruction lists crowd out the earlier items, which is why the
+self-correction rule sits above the list rather than inside it, and why the
+default moved to 8B. Settings still warns when the extras are switched on,
+since anyone who picks 3B for speed will hit the same ceiling.
 
 ## Language
 

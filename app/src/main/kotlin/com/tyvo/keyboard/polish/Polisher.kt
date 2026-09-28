@@ -216,7 +216,10 @@ class Polisher(
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-        const val DEFAULT_MISTRAL_MODEL = "ministral-3b-latest"
+        // 8B rather than 3B: clean-up is a short call either way, and the
+        // extra capacity shows on the corrections that matter -- the 3B
+        // measurably drops spoken corrections once a few are enabled at once.
+        const val DEFAULT_MISTRAL_MODEL = "ministral-8b-latest"
 
         const val DEFAULT_XAI_MODEL = "grok-build-0.1"
         const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"

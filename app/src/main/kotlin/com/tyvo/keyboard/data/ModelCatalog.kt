@@ -96,14 +96,14 @@ object ModelCatalog {
 
     val MISTRAL_POLISH = listOf(
         ModelOption(
-            "ministral-3b-latest",
-            "Ministral 3B",
-            "Fastest. Available on every tier.",
-        ),
-        ModelOption(
             "ministral-8b-latest",
             "Ministral 8B",
-            "Better on long or messy dictation. Still quick.",
+            "Good balance of speed and accuracy. Every tier.",
+        ),
+        ModelOption(
+            "ministral-3b-latest",
+            "Ministral 3B",
+            "Fastest, but drops corrections when several are enabled.",
         ),
         ModelOption(
             "ministral-14b-latest",

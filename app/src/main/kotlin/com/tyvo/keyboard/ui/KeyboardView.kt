@@ -81,13 +81,17 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         orientation = VERTICAL
         setBackgroundColor(BG)
         val pad = dp(8)
-        setPadding(pad, dp(6), pad, dp(10))
+        // One gap value for the space above the first row and between rows,
+        // so the keyboard does not sit tighter against its own top edge than
+        // its rows sit against each other.
+        val rowGap = dp(8)
+        setPadding(pad, rowGap, pad, dp(10))
 
         // Keep the control row clear of the gesture-nav pill.
         setOnApplyWindowInsetsListener { v, insets ->
             val bars = WindowInsetsCompat.toWindowInsetsCompat(insets)
                 .getInsets(WindowInsetsCompat.Type.navigationBars())
-            v.setPadding(pad, dp(6), pad, dp(10) + bars.bottom)
+            v.setPadding(pad, rowGap, pad, dp(10) + bars.bottom)
             insets
         }
 
@@ -134,7 +138,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             isHorizontalScrollBarEnabled = false
             addView(actionStrip)
         }
-        addView(actionScroll, lp(MATCH, dp(46)).also { it.bottomMargin = dp(8) })
+        addView(actionScroll, lp(MATCH, dp(46)).also { it.bottomMargin = rowGap })
 
         // --- control row --------------------------------------------------
         controls = LinearLayout(context).apply {

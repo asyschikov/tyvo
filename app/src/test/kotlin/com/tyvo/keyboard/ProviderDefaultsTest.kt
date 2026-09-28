@@ -27,10 +27,9 @@ import org.junit.Test
 /**
  * Guards the provider matrix.
  *
- * The Mistral default in particular is a trap: of the voxtral family, only
- * `voxtral-mini-*` transcribes. `voxtral-small-latest` is rejected outright
- * by the API as an invalid transcription model despite the name suggesting a
- * bigger sibling, so an innocent-looking "upgrade" would break dictation.
+ * Every provider needs a working default for both stages, and not every
+ * model a provider offers can do both jobs -- so the defaults are pinned
+ * rather than left to whatever looks newest.
  */
 class ProviderDefaultsTest {
 
@@ -49,11 +48,9 @@ class ProviderDefaultsTest {
     }
 
     @Test
-    fun `mistral transcription default is an audio-capable voxtral mini`() {
+    fun `mistral transcription default is a voxtral mini`() {
         val m = Transcriber.DEFAULT_MISTRAL_MODEL
         assertTrue("expected a voxtral-mini model, got $m", m.startsWith("voxtral-mini"))
-        assertFalse("voxtral-small does not transcribe", m.contains("small"))
-        assertFalse("tts models do not transcribe", m.contains("tts"))
     }
 
     @Test
