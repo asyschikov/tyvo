@@ -135,8 +135,20 @@ object ModelCatalog {
         ),
     )
 
+    // Latency is the deciding factor here: Grok's reasoning models all answer
+    // correctly but take 2-11s, and a keyboard cannot wait that long. The
+    // non-reasoning model handles spoken corrections just as well at 0.6s.
     val XAI_POLISH = listOf(
-        ModelOption("grok-4.7", "Grok 4.7", "xAI's flagship; what their docs point at for chat."),
+        ModelOption(
+            "grok-4.20-0309-non-reasoning",
+            "Grok 4.20 (non-reasoning)",
+            "Fastest by far, and handles corrections. Recommended.",
+        ),
+        ModelOption(
+            "grok-4.7",
+            "Grok 4.7",
+            "xAI's flagship. Same results, around 2s slower.",
+        ),
     )
 
     // Gemini 2.5 is closed to new API keys: it still appears in the models

@@ -139,9 +139,8 @@ class Transcriber(
     /**
      * xAI's transcription endpoint.
      *
-     * UNVERIFIED against the live API: built from the documented shape, which
-     * mirrors OpenAI's multipart form but posts to /v1/stt rather than
-     * /v1/audio/transcriptions.
+     * Mirrors OpenAI's multipart form but posts to /v1/stt rather than
+     * /v1/audio/transcriptions. Verified against the live API.
      */
     private fun xai(audio: File): String {
         val key = settings.key(Provider.XAI)

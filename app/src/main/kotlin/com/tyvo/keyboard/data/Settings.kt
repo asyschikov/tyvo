@@ -40,7 +40,7 @@ enum class Provider(
     // best-tested. Persistence is by name, so reordering is safe.
     MISTRAL("Mistral"),
     OPENAI("OpenAI"),
-    XAI("xAI (Grok)", verified = false),
+    XAI("xAI (Grok)"),
     GEMINI("Google Gemini");
 }
 

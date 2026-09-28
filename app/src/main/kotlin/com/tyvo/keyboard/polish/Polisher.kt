@@ -221,7 +221,7 @@ class Polisher(
         // measurably drops spoken corrections once a few are enabled at once.
         const val DEFAULT_MISTRAL_MODEL = "ministral-8b-latest"
 
-        const val DEFAULT_XAI_MODEL = "grok-4.7"
+        const val DEFAULT_XAI_MODEL = "grok-4.20-0309-non-reasoning"
         const val DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
         fun defaultModelFor(p: Provider): String = when (p) {

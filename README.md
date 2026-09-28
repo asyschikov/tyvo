@@ -70,20 +70,21 @@ single API key.
 | **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-8b-latest` | ✅ |
 | OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
 | Google Gemini | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | ✅ |
-| xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-4.7` | ⚠️ untested |
+| xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-4.20-0309-non-reasoning` | ✅ |
 
 Mistral is the default and the one the author has tested most: every prompt,
 correction and measurement in this README came from running against Voxtral
 and Ministral.
 
-Gemini's models were verified against a live key: both stages transcribe and
-clean up correctly. Note that Gemini 2.5 — which earlier versions of Tyvo
-defaulted to — still appears in Google's model list but returns 404 "no longer
-available to new users", so a key made today can only call 3.x.
+All four have now had both stages run against a live key, using the same
+prompt the app sends.
 
-xAI is the one provider still untested: nobody has run a dictation through it.
-The model names come from xAI's own docs (`/v1/stt` for transcription,
-`grok-4.7` for clean-up), but the request shape has never met the live API.
+Two things that testing changed. Gemini 2.5 — which Tyvo defaulted to at
+first — still appears in Google's model list but answers 404 "no longer
+available to new users", so a key made today can only call 3.x. And xAI's
+reasoning models are too slow for a keyboard: `grok-4.7` takes about 2s and
+`grok-build-0.1` 7-11s, against 0.6s for the non-reasoning model, which
+handles spoken corrections just as well.
 
 It is also cheap enough that paying per use stops being a compromise.
 Transcription is **$0.003 a minute** at Mistral's published rates, so ten
