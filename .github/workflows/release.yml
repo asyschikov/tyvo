@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and publish (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write   # needed to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      # The keystore is held as base64 because a secret is a string. It is
+      # written outside the workspace so no later step can pick it up, and
+      # removed in an always() step below.
+      - name: Restore keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.TYVO_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::TYVO_KEYSTORE_BASE64 is not set. See RELEASING.md." >&2
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tyvo-upload.jks"
+
+      - name: Build signed APK and AAB
+        env:
+          TYVO_KEYSTORE_PATH: ${{ runner.temp }}/tyvo-upload.jks
+          TYVO_KEYSTORE_PASSWORD: ${{ secrets.TYVO_KEYSTORE_PASSWORD }}
+          TYVO_KEY_ALIAS: ${{ secrets.TYVO_KEY_ALIAS || 'tyvo' }}
+          TYVO_KEY_PASSWORD: ${{ secrets.TYVO_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease
+
+      # A bundle signed by the wrong key is rejected by Play with a message
+      # that does not name the key, so check the fingerprint here instead.
+      - name: Verify signing certificate
+        env:
+          EXPECTED: ${{ secrets.TYVO_CERT_SHA256 }}
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          ACTUAL=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK" \
+            | grep -i 'certificate SHA-256 digest' | awk '{print $NF}')
+          echo "signing cert SHA-256: $ACTUAL"
+          if [ -n "$EXPECTED" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Signed with the wrong key. Expected $EXPECTED" >&2
+            exit 1
+          fi
+
+      - name: Shred keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/tyvo-upload.jks"
+
+      - name: Rename artifacts with the version
+        id: names
+        run: |
+          V="${{ github.event.inputs.tag || github.ref_name }}"
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/tyvo-$V.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/tyvo-$V.aab"
+          (cd dist && sha256sum ./* > SHA256SUMS.txt)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.names.outputs.version }}
+          name: Tyvo ${{ steps.names.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/tyvo-${{ steps.names.outputs.version }}.apk
+            dist/tyvo-${{ steps.names.outputs.version }}.aab
+            dist/SHA256SUMS.txt
