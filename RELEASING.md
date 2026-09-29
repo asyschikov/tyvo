@@ -104,6 +104,58 @@ manifest-declared classes. The IME service is referenced only from the
 manifest, so without its rule the release build produces a keyboard that is
 simply absent — and nothing warns you.
 
+## Building in CI
+
+Two workflows, in `.github/workflows/`:
+
+- **`ci.yml`** runs on every push and pull request: unit tests, a debug APK,
+  and an *unsigned* release APK. That last one matters more than it looks --
+  R8 breaks things that compile perfectly, and the IME service is referenced
+  only from the manifest, so a missing keep rule yields a build with no
+  keyboard in it and no warning. It needs no secrets: the signing config is
+  skipped when `TYVO_KEYSTORE_PATH` is unset.
+- **`release.yml`** runs on a `v*` tag (or by hand with a tag as input). It
+  builds a signed APK and AAB, checks the signing certificate, and publishes
+  them to a GitHub Release with a `SHA256SUMS.txt`.
+
+To cut a release:
+
+```sh
+# bump versionCode and versionName in app/build.gradle.kts first
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+### Repository secrets
+
+Set these under Settings -> Secrets and variables -> Actions:
+
+| Secret | What it is |
+|---|---|
+| `TYVO_KEYSTORE_BASE64` | The `.jks`, base64-encoded (a secret is a string) |
+| `TYVO_KEYSTORE_PASSWORD` | Same value SecretSpec holds locally |
+| `TYVO_KEY_PASSWORD` | Same |
+| `TYVO_KEY_ALIAS` | Optional; defaults to `tyvo` |
+| `TYVO_CERT_SHA256` | Optional but recommended; see below |
+
+```sh
+base64 -i ~/keys/tyvo-upload.jks | pbcopy   # paste as TYVO_KEYSTORE_BASE64
+```
+
+`TYVO_CERT_SHA256` is the fingerprint the build must produce, lowercase and
+without colons:
+
+```sh
+keytool -list -v -keystore ~/keys/tyvo-upload.jks -alias tyvo \
+  | awk '/SHA256:/ {print tolower($2)}' | tr -d ':'
+```
+
+Set it. A bundle signed by the wrong key is rejected by Play with a message
+that does not tell you which key it wanted, and by then you have already
+burned a version code. The workflow fails the build instead.
+
+The keystore is written to `$RUNNER_TEMP`, outside the workspace so no later
+step can pick it up, and deleted in an `always()` step.
+
 ## Play Console
 
 The parts only you can do:
