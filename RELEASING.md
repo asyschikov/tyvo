@@ -121,20 +121,23 @@ Two workflows, in `.github/workflows/`:
 To cut a release:
 
 ```sh
-scripts/release.sh minor    # 0.2.0 -> 0.3.0, a new feature
-scripts/release.sh patch    # 0.2.0 -> 0.2.1, a fix
-scripts/release.sh major    # 0.2.0 -> 1.0.0, a breaking change
-scripts/release.sh 0.3.0    # or pass an explicit version
+make release minor    # 0.2.0 -> 0.3.0, a new feature
+make release patch    # 0.2.0 -> 0.2.1, a fix
+make release major    # 0.2.0 -> 1.0.0, a breaking change
 ```
 
 One command, from a clean checkout of main. The bump type is the third word
-of semver — **major**, **minor**, **patch**. It bumps `versionCode` (+1) and
-`versionName` in `app/build.gradle.kts`, commits the bump, tags `vX.Y.Z` and
-pushes the branch and the tag. Nothing is built locally: the tag push is what
-triggers `release.yml`, which runs the tests, builds the signed APK and AAB,
-checks the signing certificate and publishes the GitHub Release. The script
-refuses to run with a dirty worktree, off main, out of sync with origin, when
-the tag already exists, or when the version would not change.
+of semver — **major**, **minor**, **patch** — and the next number is picked
+for you. It bumps `versionCode` (+1) and `versionName` in
+`app/build.gradle.kts`, commits the bump, tags `vX.Y.Z` and pushes the
+branch and the tag. Nothing is built locally: the tag push is what triggers
+`release.yml`, which runs the tests, builds the signed APK and AAB, checks
+the signing certificate and publishes the GitHub Release. The script refuses
+to run with a dirty worktree, off main, out of sync with origin, or when the
+tag already exists.
+
+An explicit version also works — `scripts/release.sh 0.3.0` — as long as it
+increments the current one; retroactive numbers are refused.
 
 ### Repository secrets
 
