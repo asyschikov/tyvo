@@ -20,7 +20,7 @@ a heavy day costs cents, a quiet week costs nothing.
 - **History** — every dictation kept; failed ones retryable, with their audio
 - **Four providers** — Mistral, OpenAI, Gemini, xAI; one key each
 - **Switchable corrections** — spoken fixes, fillers, punctuation, grammar
-- **Language and vocabulary** — 45 languages, plus names and jargon
+- **Language and vocabulary** — as many languages as your model supports, plus names and jargon
 - **No telemetry** — no account, no analytics, no crash reporting
 
 ### Dictation with clean-up
@@ -66,8 +66,10 @@ small models.
 
 ### Language and vocabulary
 
-One language slot from a searchable list of 45; blank means auto-detect. A
-vocabulary list sends names and jargon to the transcriber as a biasing hint.
+One language slot from a searchable list of common languages; blank means
+auto-detect. The list is a picker, not a limit — transcription supports as
+many languages as your model does. A vocabulary list sends names and jargon
+to the transcriber as a biasing hint.
 
 ### No telemetry
 

@@ -284,9 +284,10 @@ since anyone who picks 3B for speed will hit the same ceiling.
 
 ## Language
 
-One slot, chosen from a searchable list of 45 languages (matching on code,
-English name or endonym). Blank means auto-detect, which is the right setting
-if you switch languages.
+One slot, chosen from a searchable list of common languages (matching on
+code, English name or endonym). Blank means auto-detect, which is the right
+setting if you switch languages. The list is a picker, not a limit:
+transcription supports as many languages as your model does.
 
 It is one slot rather than a list because the transcription APIs accept
 exactly one code — a list would only ever send its first entry, which is a
