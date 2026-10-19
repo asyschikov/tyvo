@@ -103,6 +103,31 @@ object QuickActions {
 
     // ---- Fix ------------------------------------------------------------
 
+    // The heavier counterpart to the automatic clean-up, which only does what
+    // the speaker would have typed themselves. This one may restructure, but
+    // only from spoken to written form -- tone is the thing it must not touch.
+    val WRITTEN = QuickAction(
+        id = "written",
+        label = "Written",
+        // No example slang words here: listed ones ("no cap") got pasted into
+        // outputs that never had them.
+        instruction = "Turn this dictated speech into written text, the way " +
+            "the speaker would write it if they sat down and typed it out: " +
+            "rework run-on speech into clear sentences, drop verbal tics and " +
+            "filler phrases (\"you know\", \"I mean\", \"like\", \"so yeah\", " +
+            "\"ok so\"), and turn spoken storytelling into written narration " +
+            "(\"I'm like\" -> \"I said\", \"he goes\" -> \"he said\"). This " +
+            "changes the form, never the voice. Every slang word, swear word " +
+            "and way of addressing someone that the speaker used stays exactly " +
+            "as they said it: never swap it for a tamer word, a standard word " +
+            "or a different piece of slang, and never add slang they did not " +
+            "use. Keep hedges that carry meaning (\"I guess\", \"kinda\"), " +
+            "keep every point, and add nothing they did not say, not even a " +
+            "sigh or a \"please\". Casual stays casual.",
+        group = QuickAction.Group.FIX,
+    )
+
+
     val PROOFREAD = QuickAction(
         id = "proofread",
         label = "Proofread",
@@ -141,7 +166,7 @@ object QuickActions {
 
     /** Order here is the order shown in the action bar. */
     val ALL: List<QuickAction> = listOf(
-        PROOFREAD, SHORTER, DIRECT, FORMAL, CASUAL, WARMER,
+        WRITTEN, PROOFREAD, SHORTER, DIRECT, FORMAL, CASUAL, WARMER,
         TIGHTEN, PUNCTUATE, EXPAND, BULLETS,
         TRANSLATE_EN,
     )

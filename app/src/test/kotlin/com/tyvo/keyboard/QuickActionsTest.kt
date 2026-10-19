@@ -155,7 +155,7 @@ class QuickActionsTest {
         assertTrue(only.contains("SPOKEN CORRECTIONS"))
         // Disabled corrections must be absent rather than negated: a prompt
         // full of "do not do X" reads as a list of things to consider doing.
-        assertFalse(only.contains("FALSE STARTS"))
+        assertFalse(only.contains("FILLER."))
         assertFalse(only.contains("PARAGRAPHS"))
     }
 
@@ -164,7 +164,7 @@ class QuickActionsTest {
         val p = Prompts.cleanUp(setOf(Correction.FILLER, Correction.SPOKEN_EDITS))
         // SPOKEN_EDITS is declared first, so it leads regardless of set order.
         assertTrue(p.contains("1. SPOKEN CORRECTIONS"))
-        assertTrue(p.contains("2. FALSE STARTS"))
+        assertTrue(p.contains("2. FILLER."))
     }
 
     @Test
@@ -223,6 +223,57 @@ class QuickActionsTest {
             assertTrue("summary too thin for ${it.id}", it.summary.length > 15)
             assertTrue("instruction too thin for ${it.id}", it.instruction.length > 40)
         }
+    }
+
+    @Test
+    fun `the heavy written rewrite leads the action bar`() {
+        // The automatic clean-up stays light -- what the speaker would type
+        // themselves -- so the heavier speech-to-writing pass is one tap away.
+        assertEquals("written", QuickActions.ALL.first().id)
+        assertFalse(QuickActions.WRITTEN.translating)
+    }
+
+    @Test
+    fun `cleanup prompt has no ragged margin`() {
+        // Interpolating unindented steps into an indented template once left
+        // trimIndent() nothing to strip, so every line kept eight spaces.
+        val p = Prompts.cleanUp(Correction.defaults)
+        assertTrue(p.startsWith("You are the dictation engine"))
+        assertFalse(p.lines().any { it.startsWith("        ") })
+
+        val t = Prompts.transform(QuickActions.WRITTEN.instruction)
+        assertTrue(t.startsWith("You rewrite text"))
+        assertFalse(t.lines().any { it.startsWith("        ") })
+    }
+
+    @Test
+    fun `a cue word without a replacement is not a correction`() {
+        // "no no no don't do that" came back as "Wait for me." when "sorry",
+        // "no" and "I mean" were listed as bare edit commands.
+        val p = Prompts.cleanUp(Correction.defaults)
+        assertTrue(p.contains("If there is no replacement, it is not a correction"))
+        assertTrue(p.contains("\"No no no, don't do that.\""))
+    }
+
+    @Test
+    fun `cleanup keeps how people actually talk`() {
+        // Quotatives, emphasis and tags were all being rewritten or dropped.
+        val p = Prompts.cleanUp(Correction.defaults)
+        listOf("I'm like okay", "so so good", "sorry dude", "stays present").forEach {
+            assertTrue("clean-up prompt should demonstrate '$it'", p.contains(it))
+        }
+    }
+
+    @Test
+    fun `one prompt carries the cues of every tuned language`() {
+        // Without native cues the generic prompt left "nee wacht" and
+        // "то есть" corrections undone; listing them matched per-language
+        // prompts without needing to detect the language.
+        val p = Prompts.cleanUp(Correction.defaults)
+        listOf("ich meine", "nee wacht", "то есть", "\"щас\"", "Fragezeichen", "точка").forEach {
+            assertTrue("clean-up prompt should list '$it'", p.contains(it))
+        }
+        assertTrue(p.contains("The examples below are in English"))
     }
 
     @Test
