@@ -1,7 +1,9 @@
 # Tyvo
 
-An Android keyboard that dictates, cleans up what you said, and lets you
-reshape it without leaving the keyboard.
+**Tired of yet another subscription? Can't deal with another rug pull? Hate paying for an LLM wrapper?**
+
+An Android keyboard and bubble that dictates, cleans up what you said, and lets you
+reshape it without leaving the keyboard. Free, fully private, and open source, BYOK. Stop paying for wrappers!
 
 Say "I am going to cook pasta, sorry no, lasagna" — the field gets
 "I am going to cook lasagna."
