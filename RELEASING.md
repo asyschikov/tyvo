@@ -121,9 +121,16 @@ Two workflows, in `.github/workflows/`:
 To cut a release:
 
 ```sh
-# bump versionCode and versionName in app/build.gradle.kts first
-git tag v0.2.0 && git push origin v0.2.0
+scripts/release.sh 0.2.1
 ```
+
+One command, from a clean checkout of main. It bumps `versionCode` (+1) and
+`versionName` in `app/build.gradle.kts`, commits the bump, tags `vX.Y.Z` and
+pushes the branch and the tag. Nothing is built locally: the tag push is what
+triggers `release.yml`, which runs the tests, builds the signed APK and AAB,
+checks the signing certificate and publishes the GitHub Release. The script
+refuses to run with a dirty worktree, off main, out of sync with origin, or
+when the tag already exists.
 
 ### Repository secrets
 
