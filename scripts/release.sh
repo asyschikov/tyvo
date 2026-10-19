@@ -3,7 +3,11 @@
 # the build, the signing and the publishing all happen in CI; pushing the
 # tag is what triggers release.yml. Nothing is built on this machine.
 #
-# Usage: scripts/release.sh 0.2.1
+# Usage: scripts/release.sh <major|minor|patch|X.Y.Z>
+#   major   0.2.0 -> 1.0.0   breaking change
+#   minor   0.2.0 -> 0.3.0   new feature
+#   patch   0.2.0 -> 0.2.1   fix
+#   X.Y.Z   an explicit version, if you want a specific one
 set -eu
 
 GRADLE=app/build.gradle.kts
@@ -11,17 +15,11 @@ GRADLE=app/build.gradle.kts
 die() { echo "error: $*" >&2; exit 1; }
 
 if [ $# -ne 1 ]; then
-    echo "usage: $0 <version>   e.g. $0 0.2.1" >&2
+    echo "usage: $0 <major|minor|patch|X.Y.Z>   e.g. $0 minor" >&2
     exit 2
 fi
 
-VERSION="$1"
-TAG="v$VERSION"
-
-case "$VERSION" in
-    [0-9]*.[0-9]*.[0-9]) ;;
-    *) die "version must look like 0.2.1 (got '$VERSION')" ;;
-esac
+BUMP="$1"
 
 # --- guards: a release is cut from a clean, current main -------------------
 
@@ -33,6 +31,42 @@ git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null \
 [ -z "$(git rev-list origin/main..HEAD)" ] || die "main is ahead of origin/main; push first"
 [ -z "$(git rev-list HEAD..origin/main)" ] || die "main is behind origin/main; pull first"
 
+CURRENT_NAME=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' "$GRADLE")
+CURRENT_CODE=$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' "$GRADLE")
+[ -n "$CURRENT_NAME" ] && [ -n "$CURRENT_CODE" ] \
+    || die "cannot find versionCode/versionName in $GRADLE"
+
+# --- next version: a semver bump, or an explicit one ------------------------
+
+case "$BUMP" in
+    major|minor|patch)
+        case "$CURRENT_NAME" in
+            [0-9]*.[0-9]*.[0-9]) ;;
+            *) die "current versionName '$CURRENT_NAME' is not X.Y.Z" ;;
+        esac
+        MAJOR=${CURRENT_NAME%%.*}
+        REST=${CURRENT_NAME#*.}
+        MINOR=${REST%%.*}
+        PATCH=${REST#*.}
+        case "$BUMP" in
+            major) VERSION="$((MAJOR + 1)).0.0" ;;
+            minor) VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+            patch) VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+        esac
+        ;;
+    [0-9]*.[0-9]*.[0-9])
+        VERSION="$BUMP"
+        ;;
+    *)
+        die "bump must be major, minor, patch or an explicit X.Y.Z (got '$BUMP')"
+        ;;
+esac
+
+[ "$VERSION" != "$CURRENT_NAME" ] || die "$VERSION is already the current version"
+
+TAG="v$VERSION"
+NEW_CODE=$((CURRENT_CODE + 1))
+
 if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null 2>&1; then
     die "tag $TAG already exists locally"
 fi
@@ -40,15 +74,9 @@ if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
     die "tag $TAG already exists on the remote"
 fi
 
-CURRENT_NAME=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' "$GRADLE")
-CURRENT_CODE=$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' "$GRADLE")
-[ -n "$CURRENT_NAME" ] && [ -n "$CURRENT_CODE" ] \
-    || die "cannot find versionCode/versionName in $GRADLE"
-NEW_CODE=$((CURRENT_CODE + 1))
-
 echo "release $TAG: versionCode $CURRENT_CODE -> $NEW_CODE, versionName $CURRENT_NAME -> $VERSION"
 
-# --- bump -----------------------------------------------------------------
+# --- bump ------------------------------------------------------------------
 
 sed -i.bak \
     -e "s/versionCode = [0-9][0-9]*/versionCode = $NEW_CODE/" \
@@ -62,7 +90,7 @@ fi
 git add "$GRADLE"
 git commit -m "Bump version to $VERSION"
 
-# --- tag and push ----------------------------------------------------------
+# --- tag and push -----------------------------------------------------------
 
 # Signed when a key is configured, annotated otherwise. The workflow checks
 # the signing certificate of the artifacts, not the tag signature.
