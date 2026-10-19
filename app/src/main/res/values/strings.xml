@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Tyvo</string>
     <string name="ime_name">Tyvo Voice Keyboard</string>
+    <string name="bubble_service_name">Tyvo bubble</string>
+    <string name="bubble_service_summary">Show the Tyvo bubble whenever you type.</string>
+    <string name="bubble_service_description">Show the Tyvo bubble whenever you type, with any keyboard. Tap it to dictate, hold it to edit what you dictated.\n\nTyvo never saves or sends the text already in your fields, and skips passwords.</string>
 </resources>

@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.data
 
 import android.content.Context
@@ -42,6 +25,23 @@ enum class Provider(
     OPENAI("OpenAI"),
     XAI("xAI (Grok)"),
     GEMINI("Google Gemini");
+}
+
+/** How big the floating mic is. [dp] is the circle's diameter. */
+enum class BubbleSize(val label: String, val dp: Int) {
+    SMALL("Small", 36),
+    MEDIUM("Medium", 44),
+    LARGE("Large", 52),
+}
+
+/**
+ * How see-through the floating mic is while resting. Recording and working
+ * are always fully opaque: that is when it has something to say.
+ */
+enum class BubbleOpacity(val label: String, val alpha: Float) {
+    LOW("Low", 0.4f),
+    MEDIUM("Medium", 0.7f),
+    FULL("Full", 1f),
 }
 
 /**
@@ -218,6 +218,33 @@ class Settings(context: Context) {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
+    // ---- Floating mic ----------------------------------------------------
+
+    /**
+     * Where the user left the floating mic: its top edge in screen pixels, or
+     * -1 if it has never been moved, which means "just above the keyboard".
+     */
+    var bubbleY: Int
+        get() = plain.getInt(KEY_BUBBLE_Y, -1)
+        set(v) = plain.edit().putInt(KEY_BUBBLE_Y, v).apply()
+
+    /** Which edge the floating mic is docked to. Right by default, by the thumb. */
+    var bubbleOnLeft: Boolean
+        get() = plain.getBoolean(KEY_BUBBLE_LEFT, false)
+        set(v) = plain.edit().putBoolean(KEY_BUBBLE_LEFT, v).apply()
+
+    var bubbleSize: BubbleSize
+        get() = runCatching {
+            BubbleSize.valueOf(plain.getString(KEY_BUBBLE_SIZE, null) ?: BubbleSize.LARGE.name)
+        }.getOrDefault(BubbleSize.LARGE)
+        set(v) = plain.edit().putString(KEY_BUBBLE_SIZE, v.name).apply()
+
+    var bubbleOpacity: BubbleOpacity
+        get() = runCatching {
+            BubbleOpacity.valueOf(plain.getString(KEY_BUBBLE_OPACITY, null) ?: BubbleOpacity.FULL.name)
+        }.getOrDefault(BubbleOpacity.FULL)
+        set(v) = plain.edit().putString(KEY_BUBBLE_OPACITY, v.name).apply()
+
     private companion object {
         const val KEY_PROVIDER = "provider"
         const val KEY_OPENAI = "openai_key"
@@ -233,5 +260,9 @@ class Settings(context: Context) {
         const val KEY_ONBOARDED = "has_onboarded"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
+        const val KEY_BUBBLE_Y = "bubble_y"
+        const val KEY_BUBBLE_LEFT = "bubble_left"
+        const val KEY_BUBBLE_SIZE = "bubble_size"
+        const val KEY_BUBBLE_OPACITY = "bubble_opacity"
     }
 }

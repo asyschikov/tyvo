@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the events that tell us someone started or stopped typing: focus moving,
+  and windows (the keyboard) appearing. No text-change events: the bubble has
+  no use for what people type, so it does not ask to hear about it.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/bubble_service_description"
+    android:summary="@string/bubble_service_summary"
+    android:accessibilityEventTypes="typeViewFocused|typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="80"
+    android:settingsActivity="com.tyvo.keyboard.settings.SettingsActivity" />

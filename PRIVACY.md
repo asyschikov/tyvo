@@ -70,6 +70,10 @@ header of every source file and is never requested.
   is waiting to be retried. Optional.
 - **Vibration** — haptic feedback when recording starts and stops.
 
+- **Accessibility (floating mic only)** — off unless you switch it on. Lets
+  the floating mic see which text field has focus and where the keyboard is,
+  and type your dictation into that field. See below.
+
 Tyvo asks for no access to contacts, storage, location, camera, or device
 identifiers.
 
@@ -85,6 +89,18 @@ anywhere else.
 
 Tyvo is not a general typing keyboard, and does not observe ordinary typing —
 switch back to your usual keyboard with the globe key and Tyvo sees nothing.
+
+## A note on the floating mic
+
+The floating mic is an accessibility service, and Android warns that these can
+see what is on your screen. That is accurate for any accessibility service.
+
+Tyvo's asks only to hear about focus moving and windows appearing, not about
+text changing. It reads the text of the field you are dictating into, only to
+put your dictation at the cursor and to swap it when you tap a rewrite. It
+skips password fields. Nothing it sees is stored, logged, or sent anywhere;
+only your recording, and the text you ask to rewrite, go to your chosen
+provider, exactly as with the keyboard.
 
 ## Children
 

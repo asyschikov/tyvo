@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.ime
 
 import android.Manifest
@@ -30,15 +13,14 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
+import com.tyvo.keyboard.bubble.isBubbleEnabled
 import android.content.res.Configuration
 import androidx.core.view.WindowInsetsControllerCompat
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.history.Maintenance
-import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.usage.UsageStore
 import com.tyvo.keyboard.net.TyvoException
@@ -79,6 +61,7 @@ class TyvoInputMethodService : InputMethodService() {
     private lateinit var polisher: Polisher
     private lateinit var store: RecordingStore
     private lateinit var usage: UsageStore
+    private lateinit var dictation: Dictation
 
     /** Most recent failed recording, retryable straight from the keyboard. */
     private var lastFailedId: String? = null
@@ -87,6 +70,15 @@ class TyvoInputMethodService : InputMethodService() {
     private var view: KeyboardView? = null
 
     private var pipeline: Job? = null
+
+    /**
+     * A finished dictation with nowhere to go yet: the phone locked, or the
+     * field closed, before transcription came back. Inserted as soon as a
+     * field shows the keyboard again. It is in History regardless.
+     */
+    private var pendingInsert: Dictation.Result.Text? = null
+
+    private var screenOff: android.content.BroadcastReceiver? = null
     private var ticker: Job? = null
 
     /**
@@ -104,7 +96,11 @@ class TyvoInputMethodService : InputMethodService() {
         usage = UsageStore(this)
         transcriber = Transcriber(settings, usage)
         polisher = Polisher(settings, usage)
+        dictation = Dictation(this, settings, store, transcriber, polisher)
         Maintenance.runInBackground(store, settings)
+        // Locking mid-sentence ends the dictation as if Stop was tapped,
+        // rather than as if it never happened.
+        screenOff = onScreenOff { stopAndProcess() }
     }
 
     override fun onCreateInputView(): View {
@@ -119,8 +115,10 @@ class TyvoInputMethodService : InputMethodService() {
         v.onOpenSettings = { openSettings() }
         v.onSwitchKeyboard = { switchAway() }
         v.onBackspace = { byWord -> backspace(byWord) }
+        v.onBackspaceHold = { deleteStaged() }
         v.onNewline = { commitLiteral("\n") }
         v.onSpace = { commitLiteral(" ") }
+        v.onEnableBubble = { openBubbleSetup() }
         view = v
         render(UiState.Idle())
         return v
@@ -170,7 +168,15 @@ class TyvoInputMethodService : InputMethodService() {
             session.clear()
             committed = ""
         }
-        render(stateForIdle())
+        val pending = pendingInsert
+        if (pending != null && !isLocked()) {
+            pendingInsert = null
+            commitFresh(pending.text, transcript = pending.raw)
+            render(reviewOrIdle(note = pending.note))
+        } else if (pipeline?.isActive != true) {
+            // Mid-transcription the status line is still telling the truth.
+            render(stateForIdle())
+        }
     }
 
     /**
@@ -196,10 +202,13 @@ class TyvoInputMethodService : InputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-        abortRecording()
+        // The keyboard closing -- including because the phone locked -- is
+        // not the user throwing the recording away. Finish it properly.
+        stopAndProcess()
     }
 
     override fun onDestroy() {
+        screenOff?.let { runCatching { unregisterReceiver(it) } }
         abortRecording()
         scope.cancel()
         super.onDestroy()
@@ -275,88 +284,48 @@ class TyvoInputMethodService : InputMethodService() {
      * exists to replace it.
      */
     private fun process(audio: File, durationMs: Long) {
-        val recording = try {
-            store.addPending(audio, durationMs)
-        } catch (e: Exception) {
-            // Even if indexing fails, still try to transcribe rather than
-            // dropping the dictation on the floor.
-            null
-        }
-        transcribeRecording(recording?.id, recording?.let { store.audioFor(it) } ?: audio)
+        val (id, file) = dictation.save(audio, durationMs)
+        transcribeRecording(id, file)
     }
 
     /** Runs transcription plus the polish pass for one stored recording. */
     private fun transcribeRecording(recordingId: String?, audio: File) {
         pipeline?.cancel()
         pipeline = scope.launch {
-            try {
-                render(UiState.Working("Transcribing"))
-                val raw = transcriber.transcribe(audio)
-                if (raw.isBlank()) {
-                    // Nothing heard is a real outcome, not a failure: keep the
-                    // audio so the user can check for themselves.
-                    recordingId?.let { store.markFailed(it, "No speech detected.") }
+            val result = dictation.run(recordingId, audio) { render(UiState.Working(it)) }
+            when (result) {
+                is Dictation.Result.Text -> {
+                    lastFailedId = null
+                    if (currentInputConnection == null || isLocked()) {
+                        pendingInsert = result
+                        render(UiState.Idle("Saved. It goes in when you're back in a field."))
+                    } else {
+                        commitFresh(result.text, transcript = result.raw)
+                        render(reviewOrIdle(note = result.note))
+                    }
+                }
+                Dictation.Result.NothingHeard -> {
                     lastFailedId = recordingId
-                    notifyFailure("No speech detected.")
                     render(UiState.Idle("Nothing heard. Saved to Tyvo.", canRetry = true))
-                    return@launch
                 }
-
-                recordingId?.let { store.markDone(it, raw) }
-                lastFailedId = null
-
-                val shouldPolish = settings.autoPolish && settings.polishEnabled
-                if (!shouldPolish) {
-                    commitFresh(raw)
-                    render(reviewOrIdle())
-                    return@launch
+                is Dictation.Result.Failed -> {
+                    // The keyboard offers an immediate retry, and the
+                    // notification points at the app for later -- the
+                    // recording is safe either way.
+                    lastFailedId = recordingId
+                    render(
+                        UiState.Idle(
+                            lastError = if (recordingId != null) {
+                                "${result.message} Saved - tap Retry."
+                            } else {
+                                result.message
+                            },
+                            canRetry = recordingId != null,
+                        )
+                    )
                 }
-
-                // Nothing is inserted until the text is final. Committing the
-                // raw transcript first and swapping it a second later puts
-                // visibly wrong words in someone's message and rewrites them
-                // under the cursor, which reads as a glitch even though it is
-                // faster.
-                render(UiState.Working("Cleaning up"))
-                val polished = try {
-                    polisher.cleanUp(raw)
-                } catch (e: TyvoException) {
-                    // Clean-up failed, but the words are good: insert them
-                    // rather than making the user dictate again.
-                    commitFresh(raw)
-                    render(reviewOrIdle(note = e.message))
-                    return@launch
-                }
-
-                commitFresh(polished, transcript = raw)
-                if (polished != raw) {
-                    recordingId?.let { store.updateText(it, polished) }
-                }
-                render(reviewOrIdle())
-            } catch (e: TyvoException) {
-                failRecording(recordingId, e.message ?: "Transcription failed.")
-            } catch (e: Exception) {
-                failRecording(recordingId, "Transcription failed.")
             }
         }
-    }
-
-    /**
-     * Reports a failed transcription without losing the audio.
-     *
-     * The keyboard offers an immediate retry, and a notification points at
-     * the app for later -- the recording is safe either way.
-     */
-    private fun failRecording(recordingId: String?, message: String) {
-        recordingId?.let { store.markFailed(it, message) }
-        lastFailedId = recordingId
-        if (recordingId != null) notifyFailure(message)
-        render(
-            UiState.Idle(
-                lastError = if (recordingId != null) "$message Saved - tap Retry." else message,
-                canRetry = recordingId != null,
-            )
-        )
     }
 
     /** Retries the most recent failure, straight from the keyboard. */
@@ -369,25 +338,6 @@ class TyvoInputMethodService : InputMethodService() {
             return
         }
         transcribeRecording(id, audio)
-    }
-
-    /**
-     * Tells the user a dictation was saved rather than lost.
-     *
-     * Two channels because they cover different moments: the toast is seen
-     * now, while they are still looking at the field, and the notification is
-     * found later, once they have wandered off. Both are optional, and the
-     * keyboard's own status line carries the message regardless.
-     */
-    private fun notifyFailure(message: String) {
-        if (settings.failureToasts) {
-            runCatching {
-                Toast.makeText(this, "$message Saved to Tyvo.", Toast.LENGTH_LONG).show()
-            }
-        }
-        if (settings.failureNotifications) {
-            Notifications.transcriptionFailed(this, store.needingAttention().size)
-        }
     }
 
     private fun runAction(action: QuickAction) =
@@ -554,9 +504,7 @@ class TyvoInputMethodService : InputMethodService() {
 
     private fun needsLeadingSpace(ic: InputConnection): Boolean {
         val prev = ic.getTextBeforeCursor(1, 0)?.toString()?.lastOrNull() ?: return false
-        // Join onto a word or a closing mark, but not onto an opening bracket,
-        // an existing space, or a newline.
-        return prev.isLetterOrDigit() || prev in ".,!?;:\")"
+        return joinsWithSpace(prev)
     }
 
     /**
@@ -603,6 +551,29 @@ class TyvoInputMethodService : InputMethodService() {
             }
         }
         render(UiState.Idle(canRetry = lastFailedId != null))
+    }
+
+    /**
+     * Deletes the dictated text still under review, all of it, leading space
+     * included. Returns false without touching the field if the text before
+     * the cursor is no longer exactly ours -- the user has edited it, so it is
+     * theirs now, and the held key goes back to deleting normally.
+     */
+    private fun deleteStaged(): Boolean {
+        val ic = currentInputConnection ?: return false
+        val prior = committed
+        if (prior.isEmpty() || !session.isActive) return false
+
+        ic.beginBatchEdit()
+        val matched = ic.getTextBeforeCursor(prior.length, 0)?.toString() == prior
+        if (matched) ic.deleteSurroundingText(prior.length, 0)
+        ic.endBatchEdit()
+
+        session.clear()
+        committed = ""
+        if (matched) haptic()
+        render(UiState.Idle(canRetry = lastFailedId != null))
+        return matched
     }
 
     /**
@@ -688,7 +659,14 @@ class TyvoInputMethodService : InputMethodService() {
     }
 
     private fun render(state: UiState) {
-        view?.render(state)
+        view?.let {
+            // Only the idle strip shows the chip, and recording re-renders
+            // every frame: no need to read system settings each time.
+            if (state is UiState.Idle || state is UiState.NeedsSetup) {
+                it.offerBubble = !isBubbleEnabled(this)
+            }
+            it.render(state)
+        }
     }
 
     private fun hasMicPermission(): Boolean =
@@ -700,6 +678,15 @@ class TyvoInputMethodService : InputMethodService() {
     private fun openSettings() {
         startActivity(
             Intent(this, SettingsActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
+    /** Into the app, at the explanation that comes before the switch. */
+    private fun openBubbleSetup() {
+        startActivity(
+            Intent(this, SettingsActivity::class.java)
+                .setAction(SettingsActivity.ACTION_ENABLE_BUBBLE)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }

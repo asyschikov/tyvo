@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.history
 
 import android.content.ClipData
@@ -51,6 +34,7 @@ fun HistoryRoute(
     settings: Settings,
     onOpenSettings: () -> Unit,
     onOpenUsage: () -> Unit,
+    onEnableBubble: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val usage = remember(context) { UsageStore(context) }
@@ -121,6 +105,7 @@ fun HistoryRoute(
         },
         onOpenSettings = onOpenSettings,
         onOpenUsage = onOpenUsage,
+        onEnableBubble = onEnableBubble,
     )
 }
 

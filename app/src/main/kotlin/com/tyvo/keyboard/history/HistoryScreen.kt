@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.history
 
 import androidx.compose.foundation.layout.*
@@ -48,6 +31,8 @@ fun HistoryScreen(
     onDelete: (Recording) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUsage: () -> Unit,
+    /** Null once the floating mic is on, which hides the button. */
+    onEnableBubble: (() -> Unit)?,
 ) {
     val attention = recordings.count { it.needsAttention }
 
@@ -56,6 +41,9 @@ fun HistoryScreen(
             TopAppBar(
                 title = { Text("Tyvo") },
                 actions = {
+                    onEnableBubble?.let {
+                        TextButton(onClick = it) { Text("Enable bubble") }
+                    }
                     TextButton(onClick = onOpenUsage) { Text("Usage") }
                     TextButton(onClick = onOpenSettings) { Text("Settings") }
                 },

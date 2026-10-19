@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.ui
 
 import android.annotation.SuppressLint
@@ -55,29 +38,11 @@ object KeyboardColors {
     val BG_LIGHT: Int = Color.parseColor("#ECEEF2")
 }
 
-/** The colours the keyboard draws with, in one theme. */
-private data class Palette(
-    val bg: Int,
-    val surface: Int,
-    val fg: Int,
-    val fgDim: Int,
-    val fgFaint: Int,
-    val accent: Int,
-    val accentDim: Int,
-    val rec: Int,
-    val warn: Int,
-    val onAccent: Int,
-)
-
 @SuppressLint("ViewConstructor")
 class KeyboardView(context: Context) : LinearLayout(context) {
 
     /** Resolved once per view: the IME is recreated when night mode flips. */
-    private val c: Palette =
-        if (context.resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        ) DARK else LIGHT
+    private val c: Palette = Palette.of(context)
 
     var onMicPressed: () -> Unit = {}
     var onAction: (QuickAction) -> Unit = {}
@@ -89,8 +54,24 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onOpenSettings: () -> Unit = {}
     var onSwitchKeyboard: () -> Unit = {}
     var onBackspace: (byWord: Boolean) -> Unit = {}
+
+    /**
+     * Backspace held while dictated text is still staged. Returns true if it
+     * deleted that text; false falls back to the ordinary held delete.
+     */
+    var onBackspaceHold: () -> Boolean = { false }
+
+    /** Staged text exists, so a held backspace means "delete the dictation". */
+    private var holdDeletesStaged = false
     var onNewline: () -> Unit = {}
     var onSpace: () -> Unit = {}
+    var onEnableBubble: () -> Unit = {}
+
+    /**
+     * Offer the floating mic in the idle strip. Set by the IME before each
+     * render, since the switch for it lives in system settings.
+     */
+    var offerBubble: Boolean = false
 
     private val status: TextView
     private val waveform: WaveformView
@@ -199,6 +180,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
      * repeating it on the keyboard is clutter.
      */
     fun render(state: UiState) {
+        // Holds the screen awake while the keyboard is showing: a phone that
+        // dims and locks mid-sentence cuts the dictation short.
+        keepScreenOn = state is UiState.Recording
+        holdDeletesStaged = state is UiState.Review
         when (state) {
             is UiState.NeedsSetup -> {
                 // Only the mic changes. Space, newline, backspace and the
@@ -284,6 +269,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         actionStrip.addView(chip("Space") { onSpace() })
         actionStrip.addView(chip("Newline") { onNewline() })
         actionStrip.addView(chip("Settings") { onOpenSettings() })
+        if (offerBubble) {
+            actionStrip.addView(chip("Enable bubble") { onEnableBubble() })
+        }
     }
 
     /**
@@ -358,6 +346,10 @@ class KeyboardView(context: Context) : LinearLayout(context) {
      * slow enough that people give up and go poke at the text field instead.
      * Timings follow the platform's own feel -- a pause before the repeat
      * starts so a tap is never mistaken for a hold, then acceleration.
+     *
+     * While dictated text is staged, a hold deletes all of it instead. The
+     * first character then waits for the finger to lift: deleting it on
+     * touch-down would end the session before we knew it was a hold.
      */
     @SuppressLint("ClickableViewAccessibility")
     private fun repeatingPill(label: String, onFire: (byWord: Boolean) -> Unit): TextView =
@@ -370,10 +362,24 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             isClickable = true
 
             var repeats = 0
+            /** Touch-down did not fire, so lifting the finger must. */
+            var firePending = false
+            /** The hold deleted the staged text; nothing more this press. */
+            var consumed = false
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
             lateinit var tick: Runnable
 
             tick = Runnable {
+                if (firePending) {
+                    firePending = false
+                    if (onBackspaceHold()) {
+                        consumed = true
+                        return@Runnable
+                    }
+                    onFire(false)
+                    handler.postDelayed(tick, CHAR_REPEAT_MS)
+                    return@Runnable
+                }
                 repeats++
                 // Characters first, then words once it is clearly a hold.
                 val byWord = repeats >= REPEATS_BEFORE_WORDS
@@ -387,14 +393,24 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                     android.view.MotionEvent.ACTION_DOWN -> {
                         v.isPressed = true
                         repeats = 0
-                        onFire(false)
+                        consumed = false
+                        firePending = holdDeletesStaged
+                        if (!firePending) onFire(false)
                         handler.postDelayed(tick, FIRST_REPEAT_DELAY_MS)
                         true
                     }
-                    android.view.MotionEvent.ACTION_UP,
+                    android.view.MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
+                        handler.removeCallbacks(tick)
+                        // A tap on staged text: the one character it held back.
+                        if (firePending && !consumed) onFire(false)
+                        firePending = false
+                        true
+                    }
                     android.view.MotionEvent.ACTION_CANCEL -> {
                         v.isPressed = false
                         handler.removeCallbacks(tick)
+                        firePending = false
                         true
                     }
                     else -> false
@@ -426,36 +442,6 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private companion object {
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
-
-        // Two palettes, picked from the device's night-mode setting. A
-        // keyboard sits against whatever app is showing, so a dark bar under
-        // a light chat window is the one piece of chrome that cannot be
-        // ignored.
-        private val DARK = Palette(
-            bg = Color.parseColor("#16181D"),
-            surface = Color.parseColor("#262A32"),
-            fg = Color.parseColor("#E8EAED"),
-            fgDim = Color.parseColor("#A8AEBB"),
-            fgFaint = Color.parseColor("#6B7280"),
-            accent = Color.parseColor("#4C7DF0"),
-            accentDim = Color.parseColor("#33507F"),
-            rec = Color.parseColor("#E5484D"),
-            warn = Color.parseColor("#F5A524"),
-            onAccent = Color.WHITE,
-        )
-
-        private val LIGHT = Palette(
-            bg = Color.parseColor("#ECEEF2"),
-            surface = Color.parseColor("#FFFFFF"),
-            fg = Color.parseColor("#1B1D22"),
-            fgDim = Color.parseColor("#5A6070"),
-            fgFaint = Color.parseColor("#9AA1B0"),
-            accent = Color.parseColor("#3A63D0"),
-            accentDim = Color.parseColor("#A9BCEC"),
-            rec = Color.parseColor("#C9343A"),
-            warn = Color.parseColor("#9A6200"),
-            onAccent = Color.WHITE,
-        )
 
         const val FIRST_REPEAT_DELAY_MS = 400L
         const val CHAR_REPEAT_MS = 55L

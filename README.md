@@ -38,7 +38,9 @@ grep -iE "firebase|crashlytics|analytics|sentry|bugsnag" app/build.gradle.kts
 
 Dependencies are AndroidX, the Kotlin standard library and OkHttp. Permissions
 are `RECORD_AUDIO`, `INTERNET`, `VIBRATE` and `POST_NOTIFICATIONS` — no
-contacts, storage, location or device identifiers.
+contacts, storage, location or device identifiers. The optional
+[floating mic](#floating-mic) additionally runs as an accessibility service,
+and only if you switch it on.
 
 ## How it works
 
@@ -150,6 +152,35 @@ language rule is stated first, repeated at the end, and kept deliberately
 translate English input into it. Only "→ English" is allowed to change
 language, and a typed instruction relaxes the lock only when it actually asks
 for a translation.
+
+## Floating mic
+
+Optional, and for people who would rather keep their usual keyboard: a round
+Tyvo mic that sits beside whatever keyboard is up, like the bubble in
+existing paid apps.
+
+- **Tap** to start, tap again to stop. The cleaned-up text goes into the field
+  you were typing in, at the cursor.
+- **Hold** afterwards to open the same review strip the keyboard has: undo
+  clean-up, re-clean, the quick actions, undo. A dot on the bubble means there
+  is text you can still edit like this.
+- **Drag** it up or down, or across to the other edge. It never sits under
+  the keyboard.
+
+It shows up only while a text field has focus and a keyboard is on screen,
+and stays out of the way when that keyboard is Tyvo's own. Password fields are
+skipped.
+
+It is an accessibility service, because that is the only way to type into
+another app without being its keyboard. Turn it on with **Enable bubble**, in
+the app's top bar, under Settings → Setup, or on the keyboard. It listens for focus and window changes only, not text
+changes, and reads a field's text only to place the dictation and to swap it
+when you edit. Fields that refuse a direct edit (some WebViews) get the text
+pasted instead, which leaves it on the clipboard; if even that fails, it is
+copied for you to paste.
+
+Recordings go through the same store as the keyboard's, so a failed dictation
+from the bubble waits in History like any other.
 
 ## Nothing is lost
 

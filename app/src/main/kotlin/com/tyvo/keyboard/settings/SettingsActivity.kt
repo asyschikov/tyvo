@@ -1,20 +1,3 @@
-/*
- * Tyvo -- a voice keyboard that writes what you meant.
- * Copyright (C) 2026 Andrey Syschikov
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package com.tyvo.keyboard.settings
 
 import android.Manifest
@@ -51,6 +34,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.tyvo.keyboard.data.BubbleOpacity
+import com.tyvo.keyboard.data.BubbleSize
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.data.Languages
 import com.tyvo.keyboard.data.ModelCatalog
@@ -65,6 +50,11 @@ import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.Notifications
 import com.tyvo.keyboard.history.RecordingStore
 import com.tyvo.keyboard.BuildConfig
+import com.tyvo.keyboard.bubble.BubbleSetupDialog
+import com.tyvo.keyboard.bubble.BubbleView
+import com.tyvo.keyboard.ime.UiState
+import androidx.compose.ui.viewinterop.AndroidView
+import com.tyvo.keyboard.bubble.isBubbleEnabled
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.net.ConnectionTest
 import kotlinx.coroutines.launch
@@ -84,6 +74,24 @@ class SettingsActivity : ComponentActivity() {
     companion object {
         /** Deep link from the failed-transcription notification. */
         const val ACTION_SHOW_HISTORY = "com.tyvo.keyboard.SHOW_HISTORY"
+
+        /** From the keyboard's "Enable bubble" chip: straight to the explanation. */
+        const val ACTION_ENABLE_BUBBLE = "com.tyvo.keyboard.ENABLE_BUBBLE"
+    }
+
+    /** Re-read on every resume: the switch lives in system settings. */
+    private val bubbleOn = mutableStateOf(false)
+    private val explainingBubble = mutableStateOf(false)
+
+    override fun onResume() {
+        super.onResume()
+        bubbleOn.value = isBubbleEnabled(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTask: a chip tap with the app already open lands here.
+        if (intent.action == ACTION_ENABLE_BUBBLE) explainingBubble.value = true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,6 +103,7 @@ class SettingsActivity : ComponentActivity() {
         // Captured before the composition: inside the Box below, `this`
         // refers to BoxScope rather than the activity.
         val activity = this
+        explainingBubble.value = intent?.action == ACTION_ENABLE_BUBBLE
 
         setContent {
             // Follow the device rather than forcing dark: an app that
@@ -131,6 +140,9 @@ class SettingsActivity : ComponentActivity() {
                             settings = settings,
                             onOpenSettings = { screen = Screen.SETTINGS },
                             onOpenUsage = { screen = Screen.USAGE },
+                            onEnableBubble = if (bubbleOn.value) null else {
+                                { explainingBubble.value = true }
+                            },
                         )
 
                         Screen.SETTINGS -> SettingsScreen(
@@ -148,6 +160,10 @@ class SettingsActivity : ComponentActivity() {
                                 onBack = { screen = Screen.HISTORY },
                             )
                         }
+                    }
+
+                    if (explainingBubble.value) {
+                        BubbleSetupDialog(activity) { explainingBubble.value = false }
                     }
 
                     BackHandler(
@@ -193,6 +209,9 @@ private fun SettingsScreen(
     var corrections by remember { mutableStateOf(settings.corrections()) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
+    var explainingBubble by remember { mutableStateOf(false) }
+    var bubbleSize by remember { mutableStateOf(settings.bubbleSize) }
+    var bubbleOpacity by remember { mutableStateOf(settings.bubbleOpacity) }
     val scope = rememberCoroutineScope()
 
     val readiness = remember(apiKey, provider) { Readiness.of(settings) }
@@ -278,6 +297,12 @@ private fun SettingsScreen(
                 },
             )
             SetupRow(
+                done = isBubbleEnabled(ctx),
+                label = "Enable bubble",
+                button = "Set up",
+                onClick = { explainingBubble = true },
+            )
+            SetupRow(
                 done = false,
                 showCheck = false,
                 label = "Switch to Tyvo",
@@ -287,6 +312,29 @@ private fun SettingsScreen(
                         .showInputMethodPicker()
                 },
             )
+        }
+
+        if (explainingBubble) {
+            BubbleSetupDialog(ctx) { explainingBubble = false }
+        }
+
+        // ---- bubble -------------------------------------------------------
+        // The preview floats over the card's top corner, beside the title, the
+        // way the bubble floats at the screen edge -- no row of its own.
+        Box {
+        SectionCard("Bubble") {
+            Text("Size", style = MaterialTheme.typography.bodyMedium)
+            SegmentedPicker(BubbleSize.entries, bubbleSize, { it.label }) {
+                bubbleSize = it
+                settings.bubbleSize = it
+            }
+            Text("Opacity when idle", style = MaterialTheme.typography.bodyMedium)
+            SegmentedPicker(BubbleOpacity.entries, bubbleOpacity, { it.label }) {
+                bubbleOpacity = it
+                settings.bubbleOpacity = it
+            }
+        }
+        BubblePreview(bubbleSize, bubbleOpacity, Modifier.align(Alignment.TopEnd))
         }
 
         // ---- provider, and everything belonging to it ----------------------
@@ -701,6 +749,48 @@ private fun ToggleRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * The real bubble, drawn with the picked size and opacity. The same view the
+ * service puts on screen, so what you see here is what you get over the
+ * keyboard. Rebuilt on every change, as the service does.
+ */
+@Composable
+private fun BubblePreview(size: BubbleSize, opacity: BubbleOpacity, modifier: Modifier) {
+    key(size, opacity) {
+        AndroidView(
+            factory = { ctx ->
+                BubbleView(ctx, size.dp, opacity.alpha).apply {
+                    render(UiState.Idle())
+                    importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }
+            },
+            // The view carries room for its recording halo; tuck that slack
+            // into the card's padding so the circle sits in the corner.
+            modifier = modifier.padding(top = 4.dp, end = 4.dp),
+        )
+    }
+}
+
+/** A few mutually exclusive options side by side, for short choices. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> SegmentedPicker(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        options.forEachIndexed { i, option ->
+            SegmentedButton(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                shape = SegmentedButtonDefaults.itemShape(i, options.size),
+            ) { Text(label(option)) }
         }
     }
 }
