@@ -1,408 +1,83 @@
 # Tyvo
 
-An Android keyboard that dictates, cleans up what you said, and then lets you
+An Android keyboard that dictates, cleans up what you said, and lets you
 reshape it without leaving the keyboard.
 
-Say:
-
-> "I am going to cook pasta, sorry no, lasagna"
-
-and the field gets:
-
-> I am going to cook lasagna.
-
-
-## No middlemen
-
-**There is no server.** Tyvo talks to your AI provider and nothing else — no
-account, no sign-up, no telemetry, no analytics, no crash reporting. Recordings
-and transcripts stay on the device, and your key lives in
-`EncryptedSharedPreferences`. Nothing passes through infrastructure belonging
-to this project, because there isn't any.
-
-Tired of subscriptions and rug full "fremiums"? Every app in this space wants a
-10 coins a month whether you use it twice or two hundred times, routing your
-audio through their servers to justify the bill. Tyvo is free, **bring your own key and pay
-the provider directly, per second of audio.** A heavy day costs cents; a quiet
-week costs nothing.
-
-Checkable in a few seconds, rather than taken on trust:
-
-```sh
-# every host the app can reach
-grep -rhoE 'https?://[a-zA-Z0-9.-]+' app/src/main/kotlin/ | sort -u
-
-# no analytics, crash reporting or telemetry SDKs
-grep -iE "firebase|crashlytics|analytics|sentry|bugsnag" app/build.gradle.kts
-```
-
-Dependencies are AndroidX, the Kotlin standard library and OkHttp. Permissions
-are `RECORD_AUDIO`, `INTERNET`, `VIBRATE` and `POST_NOTIFICATIONS` — no
-contacts, storage, location or device identifiers. The optional
-[floating mic](#floating-mic) additionally runs as an accessibility service,
-and only if you switch it on.
-
-## How it works
-
-```
-mic ──▶ WAV (16 kHz mono) ──▶ transcription API ──▶ raw text
-                                                      │
-                                              inserted immediately
-                                                      │
-                                                      ▼
-                                            LLM clean-up pass
-                                                      │
-                                              swapped in place
-                                                      │
-                                                      ▼
-                                     review: quick actions · undo · custom
-```
-
-Raw text is committed as soon as transcription returns, then replaced by the
-polished version. Waiting for both round-trips before showing anything makes
-the keyboard feel broken.
-
-## Providers
-
-You pick **one** provider; it handles both stages, so you only ever hold a
-single API key.
-
-| Provider | Transcription | Clean-up | Tested |
-|---|---|---|---|
-| **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-8b-latest` | ✅ |
-| OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
-| Google Gemini | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | ✅ |
-| xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-4.20-0309-non-reasoning` | ✅ |
-
-Mistral is the default and the one the author has tested most: every prompt,
-correction and measurement in this README came from running against Voxtral
-and Ministral.
-
-All four have now had both stages run against a live key, using the same
-prompt the app sends.
-
-Two things that testing changed. Gemini 2.5 — which Tyvo defaulted to at
-first — still appears in Google's model list but answers 404 "no longer
-available to new users", so a key made today can only call 3.x. And xAI's
-reasoning models are too slow for a keyboard: `grok-4.7` takes about 2s and
-`grok-build-0.1` 7-11s, against 0.6s for the non-reasoning model, which
-handles spoken corrections just as well.
-
-It is also cheap enough that paying per use stops being a compromise.
-Transcription is **$0.003 a minute** at Mistral's published rates, so ten
-minutes of dictation a day is about **$11 a year**. Check the
-[current rates](https://mistral.ai/pricing) before relying on that — that is
-the figure at time of writing, not a promise.
-
-> **xAI and Gemini are built from their published documentation and have not
-> been run against the live API.** Model IDs, endpoints and response shapes
-> are as documented rather than as observed, so any of them may be wrong.
-> Settings shows a warning when one is selected. Mistral was verified against
-> the real API throughout — including finding that it silently ignores the
-> `language` parameter — so treat the unverified pair with the same
-> suspicion until someone has dictated through them.
->
-> Gemini is the odd one out structurally: it has no transcription endpoint at
-> all, so audio is base64'd into an ordinary `generateContent` call and the
-> model is asked to transcribe it. It also authenticates with `x-goog-api-key`
-> rather than a bearer token, and caps inline audio at 20 MB.
-
-Keys and model choices are stored **per provider**, so switching to the other
-one and back does not cost you a key you already pasted in.
-
-Note on model names: of the Voxtral family, only `voxtral-mini-*` reports
-`audio_transcription` capability. `voxtral-small-latest` does **not**
-transcribe despite the name — the API rejects it outright — so overriding the
-Mistral model carelessly will break dictation. Unit tests pin the defaults.
-
-## Quick actions
-
-Offered on the review strip after dictation, each one re-editable and undoable:
-
-**Fix** — Proofread · Punctuate · Tighten · → English
-**Tone** — Formal · Casual · Warmer · Direct
-**Length** — Shorter · Expand · Bullets
-
-### How actions compose
-
-Every action transforms the **base** text, never the previous action's output.
-Tapping Formal then Shorter gives a short version of the base, not a short
-version of the formal rewrite — chaining rewrites compounds the model's drift,
-and after three taps you are editing something several steps removed from what
-you said. Actions are alternatives to each other; the applied one is
-highlighted, and Undo returns to the base.
-
-The base starts as the cleaned-up dictation, because that is what you see and
-think of as "your text". **Undo clean-up** swaps it for the raw transcript.
-That is lossy on purpose: the cleaned-up version is discarded, and
-**Re-clean** produces a fresh one rather than restoring it.
-
-```
-raw transcript ──clean up──▶ base ──action──▶ variant (in the field)
-      ▲                       │                  │
-      └── Undo clean-up ──────┘        Undo ──────┘
-```
-
-### Language
-
-Actions never change the language. The instructions are written in English,
-which is enough on its own to pull Russian or German text into English, so the
-language rule is stated first, repeated at the end, and kept deliberately
-*relative* — it never names a language, because naming one made a small model
-translate English input into it. Only "→ English" is allowed to change
-language, and a typed instruction relaxes the lock only when it actually asks
-for a translation.
-
-## Floating mic
-
-Optional, and for people who would rather keep their usual keyboard: a round
-Tyvo mic that sits beside whatever keyboard is up, like the bubble in
-existing paid apps.
-
-- **Tap** to start, tap again to stop. The cleaned-up text goes into the field
-  you were typing in, at the cursor.
-- **Hold** afterwards to open the same review strip the keyboard has: undo
-  clean-up, re-clean, the quick actions, undo. A dot on the bubble means there
-  is text you can still edit like this.
-- **Drag** it up or down, or across to the other edge. It never sits under
-  the keyboard.
-
-It shows up only while a text field has focus and a keyboard is on screen,
-and stays out of the way when that keyboard is Tyvo's own. Password fields are
-skipped.
-
-It is an accessibility service, because that is the only way to type into
-another app without being its keyboard. Turn it on with **Enable bubble**, in
-the app's top bar, under Settings → Setup, or on the keyboard. It listens for focus and window changes only, not text
-changes, and reads a field's text only to place the dictation and to swap it
-when you edit. Fields that refuse a direct edit (some WebViews) get the text
-pasted instead, which leaves it on the clipboard; if even that fails, it is
-copied for you to paste.
-
-Recordings go through the same store as the keyboard's, so a failed dictation
-from the bubble waits in History like any other.
-
-## Nothing is lost
-
-A failed transcription used to destroy the recording, so the words were simply
-gone. Now audio is written to the store and indexed **before** the network is
-touched, and deleted only once text exists to replace it. Losing signal,
-crashing, or being killed mid-request cannot take a dictation with it.
-
-When transcription fails:
-
-- the keyboard shows the error and a **Retry** chip, so you can try again
-  without leaving the field
-- a notification says the recording was saved, and opens straight into History
-- the recording waits in **History** with its audio, retryable or exportable
-
-**History** lists every dictation, newest first, with unfinished ones pinned to
-the top. Transcribed entries keep their text and can be copied; failed and
-pending ones keep their WAV and offer Retry and Save audio.
-
-Successful recordings discard their audio the moment they are transcribed —
-the text is what you wanted, and 16 kHz mono runs about 1.9 MB per minute.
-Anything else loses its audio after 24 hours, swept on app or keyboard start.
-**Transcripts are never deleted automatically**; only the audio expires, so an
-old entry stops being retryable but never stops being readable.
-
-Settings has *Keep failed recordings indefinitely* for the case where the
-audio is the only copy of what you said. It exempts failures only — successful
-recordings still expire on schedule.
-
-### How durable is it?
-
-The audio files are the irreplaceable part, and they are written once and
-never mutated. The index is a single JSON file, rewritten in full, `fsync`ed,
-then renamed over the old one — renaming is atomic for readers, but without
-the sync a power loss can leave the renamed file full of zeroes. There is
-deliberately no in-place fallback: a failed write that leaves the previous
-index intact beats one that truncates it.
-
-The index is also *disposable*. On start-up the store scans for WAVs it has
-lost track of and re-adopts them as pending, so even deleting the index
-outright costs you metadata rather than recordings.
-
-One known limit: the store is not safe against the app and the keyboard
-writing at the same instant, since its lock is per-process. Two simultaneous
-writes could lose one update — never a WAV.
-
-## The app
-
-Three screens:
-
-- **Welcome** — shown once, on first run. What the keyboard does, then only
-  the three things it cannot work without: an API key, the microphone, and
-  enabling Tyvo in Android's keyboard settings. Models, corrections, language
-  and retention all have sensible defaults and stay out of the way until
-  someone goes looking.
-- **History** — home from then on. Every dictation, unfinished ones pinned to
-  the top.
-- **Settings** — a tap away from History, back returns.
-
-## Setup
-
-1. Install the APK and open **Tyvo**.
-2. Grant microphone access.
-3. Enable Tyvo in system keyboard settings, then switch to it.
-4. Paste an API key. [Mistral](https://console.mistral.ai/) is the default and
-   the best-tested; any of the four will do. It is stored in
-   `EncryptedSharedPreferences` and sent only to that provider.
-5. Hit **Test connection** to confirm the key and model work.
-
-## Corrections
-
-Clean-up is a list of things the model is allowed to do, each switchable:
-
-| Correction | Default | What it does |
-|---|---|---|
-| Spoken corrections | on | "cook pasta, sorry no, lasagna" → "cook lasagna" |
-| Filler and false starts | on | Drops "um", "uh", stutters, abandoned clauses |
-| Punctuation and capitalisation | on | Adds what speech does not carry |
-| Spoken punctuation | on | "question mark" becomes `?` |
-| Light grammar | on | Agreement and obvious transcription slips |
-| Paragraph breaks | off | Splits long dictation where the topic changes |
-| Numbered lists | off | "first… second… next…" becomes a numbered list |
-| Numbers and dates | off | "twenty five euros" → "EUR 25" |
-
-Disabled ones are left out of the prompt entirely rather than negated — a
-prompt full of "do not do X" reads to a small model as a list of things worth
-considering.
-
-**The optional ones cost accuracy on small models.** Measured on the
-spoken-correction case:
-
-| Model | 5 defaults | all 8 |
-|---|---|---|
-| `ministral-3b` | 3/3 | **0/3** |
-| `ministral-8b` *(default)* | 3/3 | **3/3** |
-
-Longer instruction lists crowd out the earlier items, which is why the
-self-correction rule sits above the list rather than inside it, and why the
-default moved to 8B. Settings still warns when the extras are switched on,
-since anyone who picks 3B for speed will hit the same ceiling.
-
-## Language
-
-One slot, chosen from a searchable list of 45 languages (matching on code,
-English name or endonym). Blank means auto-detect, which is the right setting
-if you switch languages.
-
-It is one slot rather than a list because the transcription APIs accept
-exactly one code — a list would only ever send its first entry, which is a
-setting that lies about what it does.
-
-## Vocabulary
-
-Names and jargon the transcriber keeps mangling: product names, colleagues,
-technical terms. Sent as a biasing prompt (OpenAI) or `context_bias` terms
-(Mistral, max 100). A nudge, not a dictionary.
-
-### How much the language hint actually helps
-
-Mistral documents `language` as an accuracy hint layered on top of
-auto-detection, not a constraint — and measured against the live API it has no
-observable effect at all:
-
-| Audio | `language` | Result |
-|---|---|---|
-| Russian | *omitted* | correct Russian |
-| Russian | `en` | byte-identical Russian |
-| Russian | `bg` | byte-identical Russian |
-| Bulgarian | `ru` | byte-identical Bulgarian |
-| Russian with English loanwords | all of the above | identical |
-
-An invalid code like `en,ru` is rejected with `422 Invalid language alpha2
-code`, so it is validated and then apparently unused. The `language` field in
-the *response* is always `null`, even for clear speech with no
-`timestamp_granularities` set — undocumented, and it means there is no
-detection result to act on either.
-
-Mistral's docs describe it as an accuracy hint layered on top of
-auto-detection rather than a constraint, so this is documented behaviour
-rather than a fault. OpenAI's claim is stronger — "improve accuracy and
-latency", where the latency gain implies detection is genuinely skipped.
-
-Tyvo sends it to both anyway: it costs one form field, and it will take effect
-on Mistral if that ever changes.
-
-There is also no way to recover from a mis-detection after the fact. The
-response's `language` field is always `null` (even with no
-`timestamp_granularities`, the one documented incompatibility), so there is no
-detection result to branch on — and re-transcribing with a forced hint
-provably returns identical text. A "detect the language during clean-up and
-retry" path would have nothing to trigger it and nothing to fix.
-
-## Build
-
-```sh
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
-```
-
-## Design notes
-
-**Why not a full keyboard?** Tyvo does one thing. The globe key returns you to
-your usual IME for ordinary typing.
-
-**Text safety.** When replacing polished text, the service checks the field
-still ends with exactly what it committed. If you edited it meanwhile, Tyvo
-appends instead of overwriting your edit.
-
-**Prompt discipline.** Both prompts explicitly forbid the model answering,
-acting on, or translating the content — dictating "what time is the meeting?"
-must yield that question, not an answer to it.
-
-## Model selection
-
-Both stages offer a dropdown of curated models plus a **Custom…** option for
-any model ID. Blank means "provider default", so defaults can improve without
-stranding you on an old pin.
-
-### A note on Mistral tiers
-
-Mistral gates larger models by subscription tier, and reports it as
-`HTTP 429 Rate limit exceeded` — which reads like throttling but really means
-"not included in your plan". Empirically, on a low tier:
-
-| Model | Result |
-|---|---|
-| `ministral-3b/8b/14b-latest`, `open-mistral-nemo` | ✅ work |
-| `mistral-small-latest`, `mistral-medium-latest`, `magistral-small-latest` | ❌ 429 |
-| `mistral-large-latest` | ❌ 403 "not available in your subscription tier" |
-
-The 403 on `large` is what gives the game away: the 429s are the same gating
-with a friendlier status code. This is observed behaviour, not documented
-policy. **Test connection** in settings tells you which bucket you are in.
-
-## Status
-
-Verified working on a Pixel 10 (Android 17):
-
-- IME registers, is selectable, renders without crashing
-- Settings, permissions, encrypted key storage
-- Live HTTPS calls to Mistral; errors surface as readable text
-- WAV format accepted by the transcription endpoint (HTTP 200)
-- Clean-up prompt: 8/8 on a tricky-transcript suite against the real API
-- 85 unit tests
-
-Not yet verified end to end: speaking into the mic and getting polished text
-back. Every part of that path is verified on its own; nobody has yet held the
-mic and talked.
-
-## Privacy
-
-There is no server, so there is very little to say: see
-[PRIVACY.md](PRIVACY.md), which includes the commands to check its claims
-against the source.
-
-## Licence
-
-GPLv3 — see [LICENSE](LICENSE). Use it, change it, share it; if you distribute
-a modified version, it has to stay open under the same terms.
-
-**Alternative licences are available on request.** If GPLv3 does not suit what
-you want to build, get in touch at asyschikov+tyvo@gmail.com and we can sort
-something out.
+Say "I am going to cook pasta, sorry no, lasagna" — the field gets
+"I am going to cook lasagna."
+
+There is no server and no subscription: Tyvo talks to your AI provider and
+nothing else. Bring your own key and pay the provider per second of audio —
+a heavy day costs cents, a quiet week costs nothing.
+
+## Features
+
+- **Dictation with clean-up** — raw text first, polished text swapped in
+- **Quick actions** — proofread, tone and length rewrites from the review strip
+- **Floating mic** — dictate into any field, with your usual keyboard
+- **History** — every dictation kept; failed ones retryable, with their audio
+- **Four providers** — Mistral, OpenAI, Gemini, xAI; one key each
+- **Switchable corrections** — spoken fixes, fillers, punctuation, grammar
+- **Language and vocabulary** — 45 languages, plus names and jargon
+- **No telemetry** — no account, no analytics, no crash reporting
+
+### Dictation with clean-up
+
+Audio is recorded as 16 kHz mono WAV and transcribed by your provider. The
+raw text is committed the moment transcription returns, then swapped for a
+cleaned-up version. Lock the phone mid-sentence and the dictation still
+finishes, waiting to be inserted when you are back in a field.
+
+### Quick actions
+
+The review strip offers **Fix** (proofread, punctuate, tighten, → English),
+**Tone** (formal, casual, warmer, direct) and **Length** (shorter, expand,
+bullets). Each action rewrites the base text rather than stacking on the
+previous one, and Undo returns to the base.
+
+### Floating mic
+
+An optional accessibility service shows a draggable mic beside whatever
+keyboard is up, so you can dictate into any field without switching
+keyboards. Tap to dictate at the cursor, hold for the review strip. Password
+fields are skipped, and it stays out of the way when Tyvo's own keyboard is
+showing.
+
+### History
+
+Every dictation is listed, unfinished ones pinned to the top. A failed
+transcription keeps its audio and can be retried or exported; a successful
+one keeps its text forever and drops the audio.
+
+### Providers
+
+One provider handles both transcription and clean-up, so you hold a single
+key: Mistral (default, most tested), OpenAI, Google Gemini or xAI. Keys and
+model choices are stored per provider in `EncryptedSharedPreferences`.
+
+### Corrections
+
+What clean-up may do — spoken corrections ("pasta, sorry no, lasagna"),
+filler removal, punctuation, light grammar — is switchable in Settings. The
+optional extras (paragraph breaks, lists, numbers and dates) cost accuracy on
+small models.
+
+### Language and vocabulary
+
+One language slot from a searchable list of 45; blank means auto-detect. A
+vocabulary list sends names and jargon to the transcriber as a biasing hint.
+
+### No telemetry
+
+No account, no analytics, no crash reporting. Recordings and transcripts
+stay on the device, and nothing passes through infrastructure belonging to
+this project, because there isn't any. See [PRIVACY.md](PRIVACY.md).
+
+## Get started
+
+Download the APK from [Releases](https://github.com/asyschikov/tyvo/releases),
+enable Tyvo in Android's keyboard settings, paste an API key.
+
+Full documentation — providers, corrections, durability, design notes, build
+instructions: [docs/README.md](docs/README.md). Licence: GPLv3, see
+[LICENSE](LICENSE).
