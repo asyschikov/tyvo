@@ -19,3 +19,7 @@ release/
 # without containing any of them.
 *.jks
 keystore.properties
+
+research/**/__pycache__/
+# Raw eval outputs: regenerate with the harness; the scores live in stats.md.
+research/cleanup-eval/results/
