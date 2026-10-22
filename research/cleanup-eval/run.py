@@ -23,7 +23,8 @@ def need_key():
 
 
 def call(model, system, user):
-    body = json.dumps({"model": model, "temperature": 0, "messages": [
+    extra = {"reasoning_effort": "none"} if model.startswith(("mistral-small", "mistral-medium", "mistral-large")) else {}
+    body = json.dumps({"model": model, "temperature": 0, "top_p": 1, **extra, "messages": [
         {"role": "system", "content": system},
         {"role": "user", "content": prompts.wrap_input(user)}]}).encode()
     for attempt in range(6):

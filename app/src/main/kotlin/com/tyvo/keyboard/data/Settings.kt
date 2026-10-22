@@ -4,7 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.tyvo.keyboard.actions.QuickAction
+import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.polish.Correction
+import com.tyvo.keyboard.polish.Prompts
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * The AI provider backing the whole keyboard.
@@ -203,6 +208,81 @@ class Settings(context: Context) {
         enabledCorrections = if (on) enabledCorrections + c.id else enabledCorrections - c.id
     }
 
+    /** The user's own clean-up rules, added to the prompt as its last step. */
+    var cleanupRules: String
+        get() = plain.getString(KEY_CLEANUP_RULES, "").orEmpty()
+        set(v) = plain.edit().putString(KEY_CLEANUP_RULES, v).apply()
+
+    /**
+     * A clean-up prompt the user wrote in full, or blank for the built one.
+     * While set, the corrections and rules above it are not used.
+     */
+    var cleanupPrompt: String
+        get() = plain.getString(KEY_CLEANUP_PROMPT, "").orEmpty()
+        set(v) = plain.edit().putString(KEY_CLEANUP_PROMPT, v).apply()
+
+    /**
+     * The built prompt as it stood when the user saved their own. When the
+     * app later ships a different one, the two no longer match and the
+     * editor says so -- an edited prompt otherwise misses every improvement.
+     */
+    var cleanupPromptBase: String
+        get() = plain.getString(KEY_CLEANUP_BASE, "").orEmpty()
+        set(v) = plain.edit().putString(KEY_CLEANUP_BASE, v).apply()
+
+    /** What the clean-up prompt would be without the user's full override. */
+    fun builtCleanupPrompt(): String = Prompts.cleanUp(corrections(), cleanupRules)
+
+    /** The system prompt clean-up actually sends. */
+    fun cleanupSystemPrompt(): String = cleanupPrompt.ifBlank { builtCleanupPrompt() }
+
+    fun saveCleanupPrompt(text: String) {
+        val built = builtCleanupPrompt()
+        // Saving the built prompt unchanged is not an override.
+        if (text.isBlank() || text.trim() == built.trim()) {
+            resetCleanupPrompt()
+        } else {
+            cleanupPrompt = text
+            cleanupPromptBase = built
+        }
+    }
+
+    fun resetCleanupPrompt() {
+        cleanupPrompt = ""
+        cleanupPromptBase = ""
+    }
+
+    /** True when the user's prompt was written against an older built one. */
+    val cleanupDefaultChanged: Boolean
+        get() = cleanupPrompt.isNotBlank() && cleanupPromptBase != builtCleanupPrompt()
+
+    /** Built-in quick actions whose instruction the user rewrote, by id. */
+    var actionEdits: Map<String, String>
+        get() = runCatching {
+            val o = JSONObject(plain.getString(KEY_ACTION_EDITS, null) ?: "{}")
+            o.keys().asSequence().associateWith { o.getString(it) }
+        }.getOrDefault(emptyMap())
+        set(v) = plain.edit().putString(KEY_ACTION_EDITS, JSONObject(v).toString()).apply()
+
+    /** Quick actions the user made, in the order they made them. */
+    var customActions: List<QuickAction>
+        get() = runCatching {
+            val a = JSONArray(plain.getString(KEY_CUSTOM_ACTIONS, null) ?: "[]")
+            (0 until a.length()).map {
+                val o = a.getJSONObject(it)
+                QuickActions.custom(o.getString("id"), o.getString("label"), o.getString("instruction"))
+            }
+        }.getOrDefault(emptyList())
+        set(v) = plain.edit().putString(
+            KEY_CUSTOM_ACTIONS,
+            JSONArray(v.map {
+                JSONObject().put("id", it.id).put("label", it.label).put("instruction", it.instruction)
+            }).toString(),
+        ).apply()
+
+    /** The action bar: built-ins as the user edited them, then their own. */
+    fun quickActions(): List<QuickAction> = QuickActions.merged(actionEdits, customActions)
+
     /**
      * The language sent to the transcriber, or blank to let it detect.
      *
@@ -293,6 +373,11 @@ class Settings(context: Context) {
         const val KEY_KEEP_FAILED = "keep_failed_audio"
         const val KEY_DISCARD_SHORT_SILENCE = "discard_short_silence"
         const val KEY_CORRECTIONS = "enabled_corrections"
+        const val KEY_CLEANUP_RULES = "cleanup_rules"
+        const val KEY_CLEANUP_PROMPT = "cleanup_prompt"
+        const val KEY_CLEANUP_BASE = "cleanup_prompt_base"
+        const val KEY_ACTION_EDITS = "action_edits"
+        const val KEY_CUSTOM_ACTIONS = "custom_actions"
         const val KEY_ONBOARDED = "has_onboarded"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"

@@ -4,6 +4,7 @@ import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,6 +59,15 @@ class ProviderDefaultsTest {
         // anything new starts false until someone actually dictates with it.
         Provider.entries.forEach {
             assertTrue("${it.label} has not been run against the live API", it.verified)
+        }
+    }
+
+    @Test
+    fun `reasoning is switched off only for models that accept the field`() {
+        assertTrue(Polisher.reasonsByDefault("mistral-large-4"))
+        assertTrue(Polisher.reasonsByDefault("mistral-small-2603"))
+        listOf("ministral-8b-latest", "ministral-3b-latest", "open-mistral-nemo").forEach {
+            assertFalse("$it rejects reasoning_effort with 400", Polisher.reasonsByDefault(it))
         }
     }
 }

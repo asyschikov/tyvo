@@ -65,7 +65,7 @@ import com.tyvo.keyboard.transcribe.Transcriber
 import com.tyvo.keyboard.ui.FeedbackButton
 
 /** Which of the app's screens is showing. */
-private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE }
+private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE, PROMPT }
 
 class SettingsActivity : ComponentActivity() {
 
@@ -150,6 +150,12 @@ class SettingsActivity : ComponentActivity() {
                             settings = settings,
                             activity = activity,
                             onBack = { screen = Screen.HISTORY },
+                            onEditPrompt = { screen = Screen.PROMPT },
+                        )
+
+                        Screen.PROMPT -> CleanupPromptScreen(
+                            settings = settings,
+                            onBack = { screen = Screen.SETTINGS },
                         )
 
                         Screen.USAGE -> {
@@ -168,8 +174,9 @@ class SettingsActivity : ComponentActivity() {
                     }
 
                     BackHandler(
-                        enabled = screen == Screen.SETTINGS || screen == Screen.USAGE
-                    ) { screen = Screen.HISTORY }
+                        enabled = screen == Screen.SETTINGS || screen == Screen.USAGE ||
+                            screen == Screen.PROMPT
+                    ) { screen = if (screen == Screen.PROMPT) Screen.SETTINGS else Screen.HISTORY }
 
                     // One button for the whole app rather than one per
                     // screen: the moment someone has something to say is
@@ -188,6 +195,7 @@ private fun SettingsScreen(
     settings: Settings,
     activity: ComponentActivity,
     onBack: () -> Unit,
+    onEditPrompt: () -> Unit,
 ) {
     val ctx = activity as Context
 
@@ -213,6 +221,9 @@ private fun SettingsScreen(
     var passwordBehavior by remember { mutableStateOf(settings.passwordBehavior) }
     var uriBehavior by remember { mutableStateOf(settings.uriBehavior) }
     var corrections by remember { mutableStateOf(settings.corrections()) }
+    var ownRules by remember { mutableStateOf(settings.cleanupRules) }
+    // Re-read on each visit: the prompt screen is where this changes.
+    val promptOverridden = remember { settings.cleanupPrompt.isNotBlank() }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var explainingBubble by remember { mutableStateOf(false) }
@@ -467,7 +478,7 @@ private fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                     )
                     val allOn = corrections.size == Correction.entries.size
-                    TextButton(onClick = {
+                    TextButton(enabled = !promptOverridden, onClick = {
                         val next = if (allOn) emptySet() else Correction.entries.toSet()
                         corrections = next
                         settings.enabledCorrections = next.map { it.id }.toSet()
@@ -481,6 +492,7 @@ private fun SettingsScreen(
                     ) {
                         Checkbox(
                             checked = on,
+                            enabled = !promptOverridden,
                             onCheckedChange = { checked ->
                                 settings.setCorrection(c, checked)
                                 corrections = settings.corrections()
@@ -516,6 +528,37 @@ private fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                OutlinedTextField(
+                    value = ownRules,
+                    onValueChange = { ownRules = it; settings.cleanupRules = it },
+                    enabled = !promptOverridden,
+                    label = { Text("Your rules") },
+                    placeholder = { Text("Anything else clean-up should know, one per line") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                Text(
+                    "Added after the corrections above, and they win if the two disagree.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Full prompt", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (promptOverridden) "Your own prompt is in use; corrections and rules are off."
+                            else "See or rewrite everything clean-up is told.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (promptOverridden) ModifiedBadge("Modified")
+                    TextButton(onClick = onEditPrompt) { Text("Edit") }
+                }
+                TryBox(settings) { cleanUp(it) }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
@@ -538,6 +581,10 @@ private fun SettingsScreen(
                     }
                 }
             }
+        }
+
+        SectionCard("Quick actions") {
+            QuickActionsEditor(settings)
         }
 
         // ---- accuracy -----------------------------------------------------

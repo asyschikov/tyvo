@@ -145,6 +145,15 @@ spoken numbers), once each (`transcribe_eval.py`):
 - **The prompts were sent with a ragged 8-space margin**, because multi-line
   values were interpolated before `trimIndent()`. Fixed.
 
+## Speed
+
+Median clean-up call, 20 calls each (`speed.py`): Ministral 3B 0.43 s, 8B
+0.51 s, 14B 0.48 s, Small 4 0.59 s, Medium 0.57 s, Large 4 1.23 s. Everything
+below Large is within about 0.15 s, which is noise next to the transcription
+call. Large 4 reasons by default and took 22.6 s until sent
+`reasoning_effort: "none"`; it also rejects `temperature: 0` without
+`top_p: 1`. The app now sends both.
+
 ## Known gaps
 
 - Present-tense storytelling still becomes past tense on 8b ("I go in" →
@@ -182,6 +191,7 @@ secretspec run -S research -- python3 heavy.py results/<light>.json ministral-8b
 | `classify.py` | sorts each word-level edit into acceptable or overreach |
 | `heavy.py` | runs the Written action on light output and checks tone, narration and corrections |
 | `transcribe_eval.py` | compares transcription models on synthesized clips (needs macOS `say`) |
+| `speed.py` | times real clean-up calls per model |
 | `e2e_lang.py` | speaks every case, transcribes it with the language reported, and cleans it up with generic+ and the native prompt |
 | `variants/` | every prompt we tested: v1–v4, per-language, generic+, Written v2/v3 |
 | `stats.md` | per-run scores behind every number above; the raw outputs are not kept |

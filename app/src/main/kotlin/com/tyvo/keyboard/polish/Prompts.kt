@@ -59,17 +59,24 @@ object Prompts {
      * those words here for all four languages matched them (91/130 clean
      * against 92/132) without having to detect the language first.
      */
-    fun cleanUp(corrections: Set<Correction>): String {
+    fun cleanUp(corrections: Set<Correction>, ownRules: String = ""): String {
         val enabled = Correction.entries.filter { it in corrections }
+        // The user's own rules come last and win any conflict: they are the
+        // one part of the prompt written for this speaker in particular.
+        val own = ownRules.trim().takeIf { it.isNotEmpty() }?.let {
+            "THE SPEAKER'S OWN RULES. They set these themselves. Follow them, and\n" +
+                "where one conflicts with anything else here, it wins:\n$it"
+        }
+        val numbered = enabled.map { it.instruction } + listOfNotNull(own)
         // With everything off there is still a job to do -- the transcript
         // should come back as it was said, not be handed to a model with an
         // empty instruction list and left to improvise.
-        val steps = if (enabled.isEmpty()) {
+        val steps = if (numbered.isEmpty()) {
             "Return the transcript unchanged apart from obvious transcription\n" +
                 "errors. Do not restyle, shorten or punctuate it."
         } else {
-            enabled.mapIndexed { i, c ->
-                "${i + 1}. ${c.instruction.replace("\n", "\n   ")}"
+            numbered.mapIndexed { i, text ->
+                "${i + 1}. ${text.replace("\n", "\n   ")}"
             }.joinToString("\n")
         }
 

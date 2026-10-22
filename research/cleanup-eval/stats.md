@@ -367,3 +367,24 @@ reported language. Language reported right on 134/134.
 generic+         52/60    17/22   21/22  25/30    115      33           0
 native           53/60    19/22   19/22  21/30    112      31           0
 ```
+
+## speed
+
+Wall-clock per clean-up call from this Mac, 2026-10-22 (`speed.py 4`):
+the app's prompt and 5 dictations from 10 to 45 words, 20 calls per model,
+models interleaved.
+
+```
+model                          n  median s   p90 s  min s  max s  out tok/s
+ministral-3b-latest           20      0.43    0.95   0.31   1.07         36
+ministral-8b-latest           20      0.51    2.21   0.30   3.08         29
+ministral-14b-latest          20      0.48    0.85   0.34   2.57         35
+mistral-small-2603            20      0.59    1.09   0.34   1.10         34
+mistral-medium-latest         20      0.57    0.82   0.33   1.39         35
+mistral-large-4               20      1.23    2.66   0.81   3.42         14
+```
+
+Large 4 needs `top_p: 1` alongside `temperature: 0` (400 otherwise) and
+reasons by default: 22.6 s median, 71 s p90, until sent
+`reasoning_effort: "none"`. Only `none` and `high` are accepted; the
+Ministrals and Nemo reject the field.

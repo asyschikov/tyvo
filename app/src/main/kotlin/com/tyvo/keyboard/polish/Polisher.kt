@@ -28,8 +28,8 @@ class Polisher(
 ) {
 
     /** Clean-up pass: applies spoken corrections, strips filler, punctuates. */
-    suspend fun cleanUp(raw: String): String =
-        run(system = Prompts.cleanUp(settings.corrections()), user = raw)
+    suspend fun cleanUp(raw: String, system: String = settings.cleanupSystemPrompt()): String =
+        run(system = system, user = raw)
 
     /** One-shot rewrite under an arbitrary instruction. */
     suspend fun transform(
@@ -89,7 +89,8 @@ class Polisher(
     private fun mistral(system: String, sent: String, original: String, model: String): String =
         chat(system, sent, original, model,
             url = "https://api.mistral.ai/v1/chat/completions",
-            key = settings.key(Provider.MISTRAL), label = "Mistral")
+            key = settings.key(Provider.MISTRAL), label = "Mistral",
+            noReasoning = reasonsByDefault(model))
 
     /**
      * One OpenAI-shaped chat call. OpenAI, Mistral and xAI differ only in
@@ -103,12 +104,17 @@ class Polisher(
         url: String,
         key: String,
         label: String,
+        noReasoning: Boolean = false,
     ): String {
         if (key.isBlank()) throw TyvoException("Add a $label API key in Tyvo settings.")
 
         val payload = JSONObject().apply {
             put("model", model)
             put("temperature", 0)
+            // Already every provider's default, but Mistral Large 4 rejects
+            // temperature 0 with 400 unless top_p is stated as 1.
+            put("top_p", 1)
+            if (noReasoning) put("reasoning_effort", "none")
             put(
                 "messages",
                 JSONArray()
@@ -207,6 +213,16 @@ class Polisher(
 
         const val DEFAULT_XAI_MODEL = "grok-4.20-0309-non-reasoning"
         const val DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+
+        /**
+         * Mistral models that take reasoning_effort. Large 4 reasons unless
+         * told not to: about 1,350 hidden tokens and 16 s for one sentence,
+         * returned as thinking blocks instead of text. The Ministrals and
+         * Nemo reject the field with 400, so it goes only to these.
+         */
+        fun reasonsByDefault(model: String): Boolean =
+            listOf("mistral-small", "mistral-medium", "mistral-large", "magistral")
+                .any { model.startsWith(it) }
 
         fun defaultModelFor(p: Provider): String = when (p) {
             Provider.OPENAI -> DEFAULT_OPENAI_MODEL

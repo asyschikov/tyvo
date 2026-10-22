@@ -21,7 +21,7 @@ data class QuickAction(
      */
     val translating: Boolean = false,
 ) {
-    enum class Group { TONE, LENGTH, FIX }
+    enum class Group { TONE, LENGTH, FIX, CUSTOM }
 }
 
 object QuickActions {
@@ -172,4 +172,25 @@ object QuickActions {
     )
 
     fun byId(id: String): QuickAction? = ALL.firstOrNull { it.id == id }
+
+    /** Ids of actions the user made start with this, so they never clash with ours. */
+    const val CUSTOM_PREFIX = "custom_"
+
+    /**
+     * The action bar as the user has shaped it: the built-ins, each with its
+     * instruction replaced where the user edited it, then the user's own
+     * actions in the order they made them. A blank edit counts as none, so
+     * clearing the field brings the built-in instruction back.
+     */
+    fun merged(edits: Map<String, String>, custom: List<QuickAction>): List<QuickAction> =
+        ALL.map { a ->
+            edits[a.id]?.trim()?.takeIf { it.isNotEmpty() }?.let { a.copy(instruction = it) } ?: a
+        } + custom.filter { it.label.isNotBlank() && it.instruction.isNotBlank() }
+
+    fun custom(id: String, label: String, instruction: String) = QuickAction(
+        id = id,
+        label = label.trim(),
+        instruction = instruction.trim(),
+        group = QuickAction.Group.CUSTOM,
+    )
 }

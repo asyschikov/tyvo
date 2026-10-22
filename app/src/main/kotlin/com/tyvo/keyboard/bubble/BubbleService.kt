@@ -417,6 +417,7 @@ class BubbleService : AccessibilityService() {
     private fun openPanel() {
         val v = BubblePanel(this)
         v.onAction = { runAction(it) }
+        v.actions = { settings.quickActions() }
         v.onUndo = { undo() }
         v.onAccept = {
             pipeline?.cancel()

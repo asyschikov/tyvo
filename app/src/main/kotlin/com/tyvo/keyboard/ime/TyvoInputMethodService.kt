@@ -122,6 +122,7 @@ class TyvoInputMethodService : InputMethodService() {
         val v = KeyboardView(this)
         v.onMicPressed = { toggleRecording() }
         v.onAction = { runAction(it) }
+        v.actions = { settings.quickActions() }
         v.onUndo = { undo() }
         v.onAccept = { acceptSession() }
         v.onRepolish = { repolish() }

@@ -55,6 +55,8 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
     var onMicPressed: () -> Unit = {}
     var onAction: (QuickAction) -> Unit = {}
+    /** Read on every render, so edits in settings show up without a restart. */
+    var actions: () -> List<QuickAction> = { QuickActions.ALL }
     var onUndo: () -> Unit = {}
     var onAccept: () -> Unit = {}
     var onRepolish: () -> Unit = {}
@@ -626,7 +628,7 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         actionStrip.addView(
             chip(if (state.isPolished) "↻ Re-clean" else "✦ Clean up", enabled) { onRepolish() }
         )
-        QuickActions.ALL.forEach { action ->
+        actions().forEach { action ->
             val on = action.id == state.activeAction
             actionStrip.addView(chip(action.label, enabled, selected = on) { onAction(action) })
         }

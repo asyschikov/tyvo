@@ -29,6 +29,8 @@ class BubblePanel(context: Context) : LinearLayout(context) {
     private val c = Palette.of(context)
 
     var onAction: (QuickAction) -> Unit = {}
+    /** Read on every render, so edits in settings show up without a restart. */
+    var actions: () -> List<QuickAction> = { QuickActions.ALL }
     var onUndo: () -> Unit = {}
     var onAccept: () -> Unit = {}
     var onDelete: () -> Unit = {}
@@ -94,7 +96,7 @@ class BubblePanel(context: Context) : LinearLayout(context) {
         actionStrip.addView(
             chip(if (state.isPolished) "↻ Re-clean" else "✦ Clean up", enabled) { onRepolish() }
         )
-        QuickActions.ALL.forEach { action ->
+        actions().forEach { action ->
             val on = action.id == state.activeAction
             actionStrip.addView(chip(action.label, enabled, selected = on) { onAction(action) })
         }
