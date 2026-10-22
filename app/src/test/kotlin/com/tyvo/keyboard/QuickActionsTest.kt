@@ -153,7 +153,9 @@ class QuickActionsTest {
     fun `prompts carry no label word for the model to echo`() {
         // A small model labels its output with a noun the prompt hands it:
         // "message" in the framing came back at the start of every dictation,
-        // a word the speaker never said.
+        // a word the speaker never said. The prompts now say "note" instead;
+        // a leading "note" the speaker did not say is removed by
+        // Polisher.stripLabel the same way.
         listOf(
             Prompts.cleanUp(Correction.defaults),
             Prompts.cleanUp(emptySet()),
