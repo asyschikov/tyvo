@@ -13,6 +13,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.InputMethodSubtype
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.audio.AudioRecorder
@@ -56,6 +58,9 @@ class TyvoInputMethodService : InputMethodService() {
     private companion object {
         /** How far back to look when deleting a word. */
         const val WORD_LOOKBEHIND = 96
+
+        /** The imeSubtypeMode of the voice subtype (mic-key handoff). */
+        const val SUBTYPE_MODE_VOICE = "voice"
     }
 
     private lateinit var settings: Settings
@@ -131,6 +136,7 @@ class TyvoInputMethodService : InputMethodService() {
         v.onEnableBubble = { openBubbleSetup() }
         v.onPadKey = { commitLiteral(it) }
         v.onEnter = { performEnter() }
+        v.onCancel = { cancelVoiceMode() }
         view = v
         render(UiState.Idle())
         return v
@@ -185,7 +191,8 @@ class TyvoInputMethodService : InputMethodService() {
         if (!yielded && pending != null && !isLocked()) {
             pendingInsert = null
             commitFresh(pending.text, transcript = pending.raw)
-            render(reviewOrIdle(note = pending.note))
+            // Voice subtype mode is dictate-and-return.
+            if (voiceMode) switchAway() else render(reviewOrIdle(note = pending.note))
         } else if (pipeline?.isActive != true) {
             // Mid-transcription the status line is still telling the truth.
             render(idleStateForMode())
@@ -200,7 +207,16 @@ class TyvoInputMethodService : InputMethodService() {
      * commit here.
      */
     private fun applyContext(info: EditorInfo?): Boolean {
+        voiceMode = isVoiceSubtype()
         val v = view ?: return false
+        if (voiceMode) {
+            // Launched from another keyboard's mic key: dictate and return,
+            // whatever the field.
+            v.compact = true
+            v.pad = null
+            return false
+        }
+        v.compact = false
         val context = info?.let { InputContext.of(it.inputType, it.imeOptions) }
             ?: InputContext.TEXT
         return when (InputContext.behaviorFor(
@@ -223,6 +239,20 @@ class TyvoInputMethodService : InputMethodService() {
                 switchAway()
                 true
             }
+        }
+    }
+
+    /** True when the active subtype is the voice one (mic-key handoff). */
+    private fun isVoiceSubtype(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        return imm?.currentInputMethodSubtype?.mode == SUBTYPE_MODE_VOICE
+    }
+
+    override fun onCurrentInputMethodSubtypeChanged(subtype: InputMethodSubtype) {
+        super.onCurrentInputMethodSubtypeChanged(subtype)
+        applyContext(currentInputEditorInfo)
+        if (!session.isActive && pipeline?.isActive != true) {
+            render(idleStateForMode())
         }
     }
 
@@ -361,7 +391,10 @@ class TyvoInputMethodService : InputMethodService() {
                         render(UiState.Idle("Saved. It goes in when you're back in a field."))
                     } else {
                         commitFresh(result.text, transcript = result.raw)
-                        render(reviewOrIdle(note = result.note))
+                        // Voice subtype mode is dictate-and-return: the text
+                        // lands, the keyboard goes back to the one that
+                        // launched it.
+                        if (voiceMode) switchAway() else render(reviewOrIdle(note = result.note))
                     }
                 }
                 Dictation.Result.NothingHeard -> {
@@ -505,6 +538,17 @@ class TyvoInputMethodService : InputMethodService() {
      */
     private fun performEnter() {
         if (!sendDefaultEditorAction(true)) commitLiteral("\n")
+    }
+
+    /**
+     * Voice subtype mode, dismissed without dictating: drop anything in
+     * flight and go back to the keyboard that launched us.
+     */
+    private fun cancelVoiceMode() {
+        pipeline?.cancel()
+        abortRecording()
+        session.clear()
+        switchAway()
     }
 
     // ---- Text commit ----------------------------------------------------

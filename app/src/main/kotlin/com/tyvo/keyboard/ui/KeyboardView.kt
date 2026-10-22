@@ -82,6 +82,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     /** Enter on a fallback pad: the field's own action, not a raw newline. */
     var onEnter: () -> Unit = {}
 
+    /** Cancel in compact mode: back to the keyboard that launched us. */
+    var onCancel: () -> Unit = {}
+
     /**
      * Offer the floating mic in the idle strip. Set by the IME before each
      * render, since the switch for it lives in system settings.
@@ -96,6 +99,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private val undoButton: TextView
     private val doneButton: TextView
     private val controls: LinearLayout
+    private val compactRow: LinearLayout
+    private val compactMic: TextView
+    private val cancelButton: TextView
     private val padView: LinearLayout
 
     /** True while the mic button is standing in as the setup prompt. */
@@ -116,6 +122,16 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 }
                 buildPad(value)
             }
+            applyChrome()
+        }
+
+    /**
+     * Compact dictate-and-return UI, for when another keyboard launched us
+     * from its mic key. The IME keeps this and [pad] mutually exclusive.
+     */
+    var compact = false
+        set(value) {
+            field = value
             applyChrome()
         }
 
@@ -207,7 +223,34 @@ class KeyboardView(context: Context) : LinearLayout(context) {
 
         addView(controls, lp(MATCH, WRAP))
 
-        // --- fallback pad -----------------------------------------------------
+        // --- compact mode (voice subtype) ------------------------------------
+        // Dictate and return: one mic, one way out. No action strip, no
+        // review controls -- the text lands and the keyboard switches back.
+        compactRow = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = GONE
+        }
+        cancelButton = pill("Cancel", accent = false) { onCancel() }
+        compactRow.addView(cancelButton, lp(WRAP, dp(56)))
+        compactMic = TextView(context).apply {
+            text = "Hold to talk"
+            gravity = Gravity.CENTER
+            setTextColor(c.onAccent)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            background = roundedDrawable(c.accent, dp(14).toFloat())
+            isClickable = true
+            setOnClickListener {
+                if (micIsSetupPrompt) onOpenSettings() else onMicPressed()
+            }
+        }
+        compactRow.addView(compactMic, LayoutParams(0, dp(56), 1f).also {
+            it.leftMargin = dp(6)
+        })
+        addView(compactRow, lp(MATCH, WRAP))
+
+        // --- fallback pads ----------------------------------------------------
         // Built per pad kind when the IME sets [pad]; see buildPad.
         padView = LinearLayout(context).apply {
             orientation = VERTICAL
@@ -232,8 +275,13 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         // dims and locks mid-sentence cuts the dictation short.
         keepScreenOn = state is UiState.Recording
         holdDeletesStaged = state is UiState.Review
-        // The fallback pad replaces the voice surface entirely; only the
-        // status line (and the waveform while recording) still react to state.
+        // The compact UI and the fallback pad replace the voice surface
+        // entirely; only the status line (and the waveform while recording)
+        // still react to state.
+        if (compact && pad == null) {
+            renderCompact(state)
+            return
+        }
         if (pad != null) {
             renderPadStatus(state)
             return
@@ -301,6 +349,55 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     }
 
     /**
+     * Compact mode: mic and cancel, nothing else. The service switches back
+     * to the keyboard that launched us as soon as text lands or the user
+     * cancels.
+     */
+    private fun renderCompact(state: UiState) {
+        when (state) {
+            is UiState.NeedsSetup -> {
+                setStatus(state.reason, c.fgDim)
+                waveform.visibility = GONE
+                compactMic.text = "Set up Tyvo to use"
+                compactMic.background = roundedDrawable(c.accent, dp(14).toFloat())
+                micIsSetupPrompt = true
+            }
+
+            is UiState.Idle -> {
+                setStatus(state.lastError, c.warn)
+                waveform.visibility = GONE
+                compactMic.text = "Hold to talk"
+                compactMic.background = roundedDrawable(c.accent, dp(14).toFloat())
+                micIsSetupPrompt = false
+            }
+
+            is UiState.Recording -> {
+                setStatus("Listening   ${fmt(state.elapsedMs)}", c.rec)
+                waveform.visibility = VISIBLE
+                compactMic.text = "Done"
+                compactMic.background = roundedDrawable(c.rec, dp(14).toFloat())
+            }
+
+            is UiState.Working -> {
+                setStatus("${state.step}…", c.fgDim)
+                waveform.visibility = GONE
+                compactMic.text = "…"
+                compactMic.background = roundedDrawable(c.accentDim, dp(14).toFloat())
+            }
+
+            is UiState.Review -> {
+                // Visible only between the text landing and the switch back
+                // to the previous keyboard.
+                setStatus(state.note, if (state.busy) c.fgDim else c.warn)
+                waveform.visibility = GONE
+                compactMic.text = "Hold to talk"
+                compactMic.background = roundedDrawable(c.accent, dp(14).toFloat())
+                micIsSetupPrompt = false
+            }
+        }
+    }
+
+    /**
      * Pad mode: only the status line (and the waveform while recording)
      * react to state. The pad works without an API key, so an unconfigured
      * keyboard still types here -- the hint says why there is no mic.
@@ -341,12 +438,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         null -> ""
     }
 
-    /** Shows the fallback pad, or the voice UI when there is none. */
+    /** Shows exactly one of the voice UI, the compact UI, or the fallback pad. */
     private fun applyChrome() {
         val padOn = pad != null
+        val compactOn = compact && !padOn
         padView.visibility = if (padOn) VISIBLE else GONE
-        actionScroll.visibility = if (padOn) GONE else VISIBLE
-        controls.visibility = if (padOn) GONE else VISIBLE
+        compactRow.visibility = if (compactOn) VISIBLE else GONE
+        actionScroll.visibility = if (padOn || compactOn) GONE else VISIBLE
+        controls.visibility = if (padOn || compactOn) GONE else VISIBLE
         if (padOn) waveform.visibility = GONE
     }
 

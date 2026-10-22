@@ -201,6 +201,15 @@ a keyboard that has handed the field away is no longer active and cannot
 switch itself back on the next field. Text fields always dictate; there is
 no setting for them.
 
+## The mic key
+
+Tyvo registers a second subtype with `imeSubtypeMode="voice"`, so keyboards
+with a voice-key handoff — HeliBoard, FlorisBoard; Gboard will not — can
+launch it from their mic key. In that mode the UI is compact: a mic and a
+cancel button, no review strip. When the dictation is committed or cancelled
+the keyboard returns to the one that launched it, via
+`switchToPreviousInputMethod()`.
+
 ## Nothing is lost
 
 A failed transcription used to destroy the recording, so the words were simply

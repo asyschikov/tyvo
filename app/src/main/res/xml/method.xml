@@ -6,4 +6,10 @@
         android:name="@string/ime_name"
         android:imeSubtypeMode="keyboard"
         android:imeSubtypeLocale="en_US" />
+    <!-- Launched from another keyboard's mic key: a compact dictate-and-return
+         UI, then back to the keyboard that launched us. -->
+    <subtype
+        android:name="@string/ime_name_voice"
+        android:imeSubtypeMode="voice"
+        android:imeSubtypeLocale="en_US" />
 </input-method>
