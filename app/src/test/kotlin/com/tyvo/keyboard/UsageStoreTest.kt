@@ -2,6 +2,7 @@ package com.tyvo.keyboard
 
 import com.tyvo.keyboard.usage.UsageEvent
 import com.tyvo.keyboard.usage.UsageStore
+import com.tyvo.keyboard.usage.perModel
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -120,5 +121,24 @@ class UsageStoreTest {
         val now = System.currentTimeMillis()
         val earlier = UsageStore.dayKey(now - 2 * 86_400_000L)
         assertTrue(earlier < UsageStore.dayKey(now))
+    }
+
+    @Test
+    fun `all time folds every day into one row per model and stage`() {
+        store.record(event(day = "2026-09-27", audio = 4))
+        store.record(event(day = "2026-09-28", audio = 6))
+        store.record(
+            event(
+                day = "2026-09-28", model = "ministral-8b-latest",
+                kind = UsageEvent.Kind.POLISH, prompt = 3, completion = 5,
+            )
+        )
+
+        val rows = store.all().perModel()
+        assertEquals(2, rows.size)
+        val t = rows.single { it.kind == UsageEvent.Kind.TRANSCRIBE }
+        assertEquals(2, t.calls)
+        assertEquals(10, t.audioSeconds)
+        assertEquals(8, rows.single { it.kind == UsageEvent.Kind.POLISH }.totalTokens)
     }
 }

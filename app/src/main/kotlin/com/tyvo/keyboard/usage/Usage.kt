@@ -35,3 +35,23 @@ data class DayUsage(
 ) {
     val totalTokens: Long get() = promptTokens + completionTokens
 }
+
+/**
+ * Every day's rows folded into one per model and stage, for the all-time
+ * view. [DayUsage.day] is left blank: the rows span every recorded day.
+ */
+fun List<DayUsage>.perModel(): List<DayUsage> =
+    groupBy { Triple(it.provider, it.model, it.kind) }
+        .map { (k, rs) ->
+            DayUsage(
+                day = "",
+                provider = k.first,
+                model = k.second,
+                kind = k.third,
+                calls = rs.sumOf { it.calls },
+                audioSeconds = rs.sumOf { it.audioSeconds },
+                promptTokens = rs.sumOf { it.promptTokens },
+                completionTokens = rs.sumOf { it.completionTokens },
+            )
+        }
+        .sortedWith(compareBy<DayUsage> { it.kind }.thenBy { it.model })

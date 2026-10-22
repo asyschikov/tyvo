@@ -30,12 +30,16 @@ class ModelCatalogTest {
     }
 
     @Test
-    fun `mistral transcription only offers voxtral mini models`() {
+    fun `mistral transcription only offers models that transcribe`() {
+        // voxtral-small-latest is a chat model and the transcription API
+        // rejects it; only voxtral-mini-* and the *-transcribe-* models work.
         ModelCatalog.MISTRAL_TRANSCRIBE.forEach {
             assertTrue(
-                "${it.id} is not a voxtral-mini model",
-                it.id.startsWith("voxtral-mini"),
+                "${it.id} is not a Voxtral transcription model",
+                it.id.startsWith("voxtral-mini") || it.id.contains("-transcribe-"),
             )
+            assertFalse("${it.id} is the chat model", it.id.startsWith("voxtral-small-2507"))
+            assertFalse("${it.id} is the chat model", it.id == "voxtral-small-latest")
         }
     }
 

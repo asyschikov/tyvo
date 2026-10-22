@@ -69,7 +69,7 @@ single API key.
 
 | Provider | Transcription | Clean-up | Tested |
 |---|---|---|---|
-| **Mistral** *(default)* | `voxtral-mini-latest` | `ministral-8b-latest` | ✅ |
+| **Mistral** *(default)* | `voxtral-small-transcribe-3` | `mistral-small-2603` | ✅ |
 | OpenAI | `gpt-4o-mini-transcribe` | `gpt-4o-mini` | ✅ |
 | Google Gemini | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | ✅ |
 | xAI (Grok) | `grok-voice-transcribe-2.0` | `grok-4.20-0309-non-reasoning` | ✅ |
@@ -110,10 +110,12 @@ the figure at time of writing, not a promise.
 Keys and model choices are stored **per provider**, so switching to the other
 one and back does not cost you a key you already pasted in.
 
-Note on model names: of the Voxtral family, only `voxtral-mini-*` reports
-`audio_transcription` capability. `voxtral-small-latest` does **not**
-transcribe despite the name — the API rejects it outright — so overriding the
-Mistral model carelessly will break dictation. Unit tests pin the defaults.
+Note on model names: of the Voxtral family, only `voxtral-mini-*` and the
+Voxtral 3 `voxtral-*-transcribe-3` models report `audio_transcription`
+capability. `voxtral-small-latest` does **not** transcribe despite the name
+(the API rejects it outright), so overriding the Mistral model carelessly will
+break dictation. Note too that `voxtral-mini-latest` still points at the
+pre-Voxtral-3 model. Unit tests pin the defaults.
 
 ## Quick actions
 
@@ -275,7 +277,7 @@ spoken-correction case:
 | Model | 5 defaults | all 8 |
 |---|---|---|
 | `ministral-3b` | 3/3 | **0/3** |
-| `ministral-8b` *(default)* | 3/3 | **3/3** |
+| `ministral-8b` | 3/3 | **3/3** |
 
 Longer instruction lists crowd out the earlier items, which is why the
 self-correction rule sits above the list rather than inside it, and why the
@@ -371,7 +373,8 @@ Mistral gates larger models by subscription tier, and reports it as
 | Model | Result |
 |---|---|
 | `ministral-3b/8b/14b-latest`, `open-mistral-nemo` | ✅ work |
-| `mistral-small-latest`, `mistral-medium-latest`, `magistral-small-latest` | ❌ 429 |
+| `mistral-small-2603` (Small 4, the clean-up default) | ✅ works as of October 2026; earlier Small versions returned 429 |
+| `mistral-medium-latest` | ❌ 429 |
 | `mistral-large-latest` | ❌ 403 "not available in your subscription tier" |
 
 The 403 on `large` is what gives the game away: the 429s are the same gating

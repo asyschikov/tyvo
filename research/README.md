@@ -81,6 +81,12 @@ one prompt and matches the per-language prompts without detecting the
 language. The one gap left is Russian on 8b, where native examples also fixed
 capitalisation (9/14 clean against 5/14, 0 lowercase outputs against 4).
 
+Re-run on Mistral Small 4 (October 2026, after it became the default):
+per-language prompts 55/66 clean against 49/66 for generic+, but 20/24
+against 19/24 on held-out cases. The whole gap is capitalisation: generic+
+left 7 outputs lowercase, 5 of them Dutch; per-language left none. Voxtral 3
+still returns `language: null`, so the transcriber cannot pick the prompt.
+
 ### Written (heavy)
 
 Spoken narration became written narration reliably, and corrections never
@@ -88,6 +94,29 @@ came back. The first instruction translated slang into plain English
 ("lowkey fire" → "actually really good") and invented details ("she sighed").
 The shipped wording forbids swapping slang and adding anything, and lists no
 example slang. Tone was lost in 5/25 cases on 8b, mostly a trailing "dude".
+
+## Transcription: Voxtral 3
+
+Voxtral 3 came out on 2026-10-20. Each model transcribed 13 clips synthesized
+with macOS `say`, in English, German, Dutch and Russian (slang, corrections,
+spoken numbers), once each (`transcribe_eval.py`):
+
+| model | mean WER | slang lost | median latency | price |
+|---|---|---|---|---|
+| `voxtral-mini-latest` (= 2602, old default) | 0.127 | haste, ff, ваще | 0.46 s | |
+| `voxtral-mini-transcribe-3` | 0.109 | haste, щас | **0.38 s** | $0.0035/min ($0.21/h) |
+| **`voxtral-small-transcribe-3`** (new default) | **0.076** | haste | 0.53 s | $0.004/min ($0.24/h) |
+
+- `voxtral-mini-latest` still points at 2602, so v3 has to be named
+  explicitly.
+- All three models write spoken numbers as digits (ten → 10, "nine, I mean
+  ten" → "9. I mean 10."). That accounts for most of the WER, equally across
+  models.
+- `language` is null in every response, on v3 too.
+- v3 accepts the app's `language` and repeated `context_bias` fields. Putting
+  "щас" in `context_bias` made both v3 models keep it instead of writing
+  "сейчас", so the app's vocabulary setting can protect slang.
+- Clean synthetic speech says nothing about noise or accents.
 
 ## Other findings
 
@@ -117,19 +146,19 @@ example slang. Tone was lost in 5/25 cases on 8b, mostly a trailing "dude".
 `cleanup-eval/` reads the prompts straight from the Kotlin sources, so it
 always tests what the app would send.
 
-The Mistral key comes from secretspec's `research` profile. It is never
+The Mistral key comes from secretspec (the `research` scope). It is never
 written to disk or exported in the shell.
 
 ```sh
-secretspec set -P research MISTRAL_API_KEY      # once; prompts for the value
+secretspec set MISTRAL_API_KEY      # once; prompts for the value
 cd research/cleanup-eval
 
-secretspec run -P research -- python3 run.py current ministral-8b-latest ministral-14b-latest
-secretspec run -P research -- python3 run.py variants/v4.txt ministral-8b-latest
-CASES=lang_cases LANG_ONLY=russian secretspec run -P research -- python3 run.py current ministral-8b-latest
+secretspec run -S research -- python3 run.py current ministral-8b-latest ministral-14b-latest
+secretspec run -S research -- python3 run.py variants/v4.txt ministral-8b-latest
+CASES=lang_cases LANG_ONLY=russian secretspec run -S research -- python3 run.py current ministral-8b-latest
 
 python3 classify.py results/<file>.json [-v]   # DROP / SUB / ADD / FAIL / CASE per model; no key needed
-secretspec run -P research -- python3 heavy.py results/<light>.json ministral-8b-latest ministral-8b-latest
+secretspec run -S research -- python3 heavy.py results/<light>.json ministral-8b-latest ministral-8b-latest
 ```
 
 | file | what it is |
@@ -140,6 +169,7 @@ secretspec run -P research -- python3 heavy.py results/<light>.json ministral-8b
 | `run.py` | calls Mistral for every case and model, and writes `results/<variant>__<models>.json` |
 | `classify.py` | sorts each word-level edit into acceptable or overreach |
 | `heavy.py` | runs the Written action on light output and checks tone, narration and corrections |
+| `transcribe_eval.py` | compares transcription models on synthesized clips (needs macOS `say`) |
 | `variants/` | every prompt we tested: v1–v4, per-language, generic+, Written v2/v3 |
 | `stats.md` | per-run scores behind every number above; the raw outputs are not kept |
 

@@ -48,14 +48,19 @@ object ModelCatalog {
 
     val MISTRAL_TRANSCRIBE = listOf(
         ModelOption(
-            "voxtral-mini-latest",
-            "Voxtral mini",
-            "The only Voxtral tier that transcribes. Recommended.",
+            "voxtral-small-transcribe-3",
+            "Voxtral Small Transcribe 3",
+            "Most accurate, $0.24/hour. Recommended.",
+        ),
+        ModelOption(
+            "voxtral-mini-transcribe-3",
+            "Voxtral Mini Transcribe 3",
+            "A little faster and cheaper, $0.21/hour.",
         ),
         ModelOption(
             "voxtral-mini-2602",
-            "Voxtral mini (pinned)",
-            "Same model, pinned so it cannot change under you.",
+            "Voxtral Mini Transcribe 2",
+            "Previous generation, $0.18/hour.",
         ),
     )
 
@@ -79,34 +84,39 @@ object ModelCatalog {
 
     val MISTRAL_POLISH = listOf(
         ModelOption(
+            "mistral-small-2603",
+            "Mistral Small 4",
+            "Latest Mistral Small. A balance of price and accuracy.",
+        ),
+        ModelOption(
             "ministral-8b-latest",
             "Ministral 8B",
-            "Good balance of speed and accuracy. Every tier.",
+            "Cheaper and faster, a little less accurate.",
         ),
         ModelOption(
             "ministral-3b-latest",
             "Ministral 3B",
-            "Fastest, but drops corrections when several are enabled.",
+            "Cheapest and fastest. Misses corrections when several are on.",
         ),
         ModelOption(
             "ministral-14b-latest",
             "Ministral 14B",
-            "Strongest model available on every tier.",
+            "Between Ministral 8B and Mistral Small.",
         ),
         ModelOption(
             "open-mistral-nemo",
             "Mistral Nemo",
-            "Open-weights mid-size. Good multilingual clean-up.",
-        ),
-        ModelOption(
-            "mistral-small-latest",
-            "Mistral Small",
-            "Stronger, but gated on lower subscription tiers.",
+            "Older open-weights model. Currently answers as Ministral 8B.",
         ),
         ModelOption(
             "mistral-medium-latest",
             "Mistral Medium",
-            "Best clean-up quality; paid tiers only.",
+            "Larger and pricier than Small. May need a paid tier.",
+        ),
+        ModelOption(
+            "mistral-large-4",
+            "Mistral Large 4",
+            "Largest and most expensive, and the slowest to answer.",
         ),
     )
 

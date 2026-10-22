@@ -160,6 +160,15 @@ class Settings(context: Context) {
         set(v) = plain.edit().putBoolean(KEY_KEEP_FAILED, v).apply()
 
     /**
+     * Throw away a fresh dictation under a few seconds that comes back with
+     * no words -- a pocket tap or a mic opened by mistake -- without saving
+     * it or saying anything. Off keeps the usual "Nothing heard. Saved".
+     */
+    var discardShortSilence: Boolean
+        get() = plain.getBoolean(KEY_DISCARD_SHORT_SILENCE, true)
+        set(v) = plain.edit().putBoolean(KEY_DISCARD_SHORT_SILENCE, v).apply()
+
+    /**
      * Whether the welcome flow has been completed.
      *
      * Drives which screen the app opens on: welcome the first time, history
@@ -256,6 +265,7 @@ class Settings(context: Context) {
         const val KEY_NOTIFY_FAIL = "notify_failures"
         const val KEY_TOAST_FAIL = "toast_failures"
         const val KEY_KEEP_FAILED = "keep_failed_audio"
+        const val KEY_DISCARD_SHORT_SILENCE = "discard_short_silence"
         const val KEY_CORRECTIONS = "enabled_corrections"
         const val KEY_ONBOARDED = "has_onboarded"
         const val KEY_LANG = "language_hint"

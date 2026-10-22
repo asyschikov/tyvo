@@ -1,5 +1,6 @@
 package com.tyvo.keyboard
 
+import com.tyvo.keyboard.data.ModelCatalog
 import com.tyvo.keyboard.data.Provider
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
@@ -30,9 +31,15 @@ class ProviderDefaultsTest {
     }
 
     @Test
-    fun `mistral transcription default is a voxtral mini`() {
+    fun `mistral transcription default is a voxtral transcription model`() {
+        // Not voxtral-small-latest: that is the chat model, and the
+        // transcription API rejects it.
         val m = Transcriber.DEFAULT_MISTRAL_MODEL
-        assertTrue("expected a voxtral-mini model, got $m", m.startsWith("voxtral-mini"))
+        assertTrue("expected a voxtral transcribe model, got $m", m.contains("-transcribe-"))
+        assertTrue(
+            "the default should be offered in the picker",
+            ModelCatalog.MISTRAL_TRANSCRIBE.any { it.id == m },
+        )
     }
 
     @Test

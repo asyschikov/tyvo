@@ -2,7 +2,7 @@
 
 usage: python3 run.py <variant> <model> [<model> ...]
   variant: 'current' (the app's prompt) or a path to a .txt system prompt
-key: $MISTRAL_API_KEY, injected by `secretspec run -P research -- python3 run.py ...`
+key: $MISTRAL_API_KEY, injected by `secretspec run -S research -- python3 run.py ...`
 """
 import json, os, re, sys, time, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
@@ -18,7 +18,7 @@ KEY = os.environ.get("MISTRAL_API_KEY")
 
 def need_key():
     if not KEY:
-        sys.exit("MISTRAL_API_KEY is not set. Run via: secretspec run -P research -- python3 run.py ...")
+        sys.exit("MISTRAL_API_KEY is not set. Run via: secretspec run -S research -- python3 run.py ...")
 
 
 def call(model, system, user):

@@ -328,3 +328,28 @@ ministral-8b-latest    n=25  tone lost 5  still spoken 0  corrections undone 0  
 ministral-14b-latest   n=25  tone lost 4  still spoken 1  corrections undone 0  length off 2
 ```
 
+
+## mistral_small_4
+
+Shipped prompt on Mistral Small 4 (`mistral-small-2603`), 2026-10-22. It became the clean-up default.
+
+```
+variant/model                                n clean  DROP  SUB  ADD FAIL CASE
+current/mistral-small-2603                  68    60     4    1    0    1    2
+current/ministral-8b-latest                 68    60     4    4    0    1    1
+lang_cases, all German/Dutch/Russian:
+current/mistral-small-2603                  66    49     6    7    0    3    7
+(ministral-8b generic+ on the same 66: 18 + 14 + 12 = 44 clean)
+```
+
+## lang_s4
+
+Per-language prompts (`variants/lang_<language>.txt`, language given) against
+generic+ on Mistral Small 4, 2026-10-22. Voxtral 3 still returns
+`language: null`, so in the app the language would have to come from elsewhere.
+
+```
+                    German  Dutch  Russian  all 66   seen 42  held-out 24  CASE
+generic+            16/22   14/22  19/22    49       30       19           7
+per-language        17/22   19/22  19/22    55       35       20           0
+```

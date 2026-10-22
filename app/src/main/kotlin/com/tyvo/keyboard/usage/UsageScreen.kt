@@ -83,6 +83,9 @@ fun UsageScreen(
                     }
                 }
             }
+            items(rows.perModel(), key = { "all|${it.provider}|${it.model}|${it.kind}" }) { row ->
+                ModelRow(row)
+            }
 
             byDay.forEach { (day, dayRows) ->
                 item {

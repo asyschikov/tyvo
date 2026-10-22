@@ -317,13 +317,15 @@ class BubbleService : AccessibilityService() {
             return
         }
         val (id, file) = dictation.save(audio, durationMs)
-        transcribe(id, file)
+        transcribe(id, file, durationMs)
     }
 
-    private fun transcribe(recordingId: String?, audio: File) {
+    private fun transcribe(recordingId: String?, audio: File, durationMs: Long? = null) {
         pipeline?.cancel()
         pipeline = scope.launch {
-            val result = dictation.run(recordingId, audio) { render(UiState.Working(it)) }
+            val result = dictation.run(recordingId, audio, durationMs) {
+                render(UiState.Working(it))
+            }
             when (result) {
                 is Dictation.Result.Text -> if (isLocked()) {
                     pendingInsert = result
@@ -334,6 +336,8 @@ class BubbleService : AccessibilityService() {
                 // Dictation has already told the user, by toast and
                 // notification; the recording waits in the app.
                 Dictation.Result.NothingHeard -> render(UiState.Idle("Nothing heard."))
+                // A mistaken tap: back to where they were, with no message.
+                Dictation.Result.Discarded -> render(reviewOrIdle())
                 is Dictation.Result.Failed -> render(UiState.Idle(result.message))
             }
             refresh()

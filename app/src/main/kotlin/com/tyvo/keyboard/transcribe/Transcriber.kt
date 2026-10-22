@@ -222,7 +222,12 @@ class Transcriber(
 
     companion object {
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini-transcribe"
-        const val DEFAULT_MISTRAL_MODEL = "voxtral-mini-latest"
+        // Voxtral 3 (October 2026), the accurate tier: on synthesized
+        // dictation its WER was 0.076 against 0.109 for Mini Transcribe 3 and
+        // 0.127 for the previous mini, for 3 cents an hour more than Mini
+        // ($0.24 against $0.21) and about 0.15s more latency. Named
+        // explicitly: no -latest alias points at Voxtral 3.
+        const val DEFAULT_MISTRAL_MODEL = "voxtral-small-transcribe-3"
 
         const val DEFAULT_XAI_MODEL = "grok-voice-transcribe-2.0"
         const val DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"

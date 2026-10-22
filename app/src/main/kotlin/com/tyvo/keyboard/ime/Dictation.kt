@@ -37,6 +37,12 @@ class Dictation(
         /** Transcribed fine, but there were no words. The audio is kept. */
         data object NothingHeard : Result
 
+        /**
+         * A short clip with no words, deleted without a trace. The caller
+         * should say nothing at all: there was nothing to lose.
+         */
+        data object Discarded : Result
+
         data class Failed(val message: String) : Result
     }
 
@@ -59,11 +65,24 @@ class Dictation(
     /**
      * Transcribes, then polishes if enabled. [onStep] receives the stage
      * name ("Transcribing", "Cleaning up") as each one begins.
+     *
+     * [durationMs] is passed only for a fresh dictation. A retry of a saved
+     * recording leaves it null, so a recording the user went back to on
+     * purpose is never discarded.
      */
-    suspend fun run(recordingId: String?, audio: File, onStep: (String) -> Unit): Result {
+    suspend fun run(
+        recordingId: String?,
+        audio: File,
+        durationMs: Long? = null,
+        onStep: (String) -> Unit,
+    ): Result {
         return try {
             onStep("Transcribing")
             val raw = transcriber.transcribe(audio)
+            if (raw.isBlank() && shouldDiscard(durationMs, settings.discardShortSilence)) {
+                if (recordingId != null) store.delete(recordingId) else audio.delete()
+                return Result.Discarded
+            }
             if (raw.isBlank()) {
                 // Nothing heard is a real outcome, not a failure: keep the
                 // audio so the user can check for themselves.
@@ -121,6 +140,14 @@ class Dictation(
      * found later, once they have wandered off. Both are optional, and the
      * caller's own status carries the message regardless.
      */
+    companion object {
+        /** Below this, a clip with no words is a mistake rather than a dictation. */
+        const val SHORT_SILENCE_MS = 3_000L
+
+        fun shouldDiscard(durationMs: Long?, enabled: Boolean): Boolean =
+            enabled && durationMs != null && durationMs < SHORT_SILENCE_MS
+    }
+
     private fun notifyFailure(message: String) {
         if (settings.failureToasts) {
             runCatching {

@@ -285,14 +285,19 @@ class TyvoInputMethodService : InputMethodService() {
      */
     private fun process(audio: File, durationMs: Long) {
         val (id, file) = dictation.save(audio, durationMs)
-        transcribeRecording(id, file)
+        transcribeRecording(id, file, durationMs)
     }
 
-    /** Runs transcription plus the polish pass for one stored recording. */
-    private fun transcribeRecording(recordingId: String?, audio: File) {
+    /**
+     * Runs transcription plus the polish pass for one stored recording.
+     * [durationMs] is set only for a fresh dictation; see [Dictation.run].
+     */
+    private fun transcribeRecording(recordingId: String?, audio: File, durationMs: Long? = null) {
         pipeline?.cancel()
         pipeline = scope.launch {
-            val result = dictation.run(recordingId, audio) { render(UiState.Working(it)) }
+            val result = dictation.run(recordingId, audio, durationMs) {
+                render(UiState.Working(it))
+            }
             when (result) {
                 is Dictation.Result.Text -> {
                     lastFailedId = null
@@ -307,6 +312,11 @@ class TyvoInputMethodService : InputMethodService() {
                 Dictation.Result.NothingHeard -> {
                     lastFailedId = recordingId
                     render(UiState.Idle("Nothing heard. Saved to Tyvo.", canRetry = true))
+                }
+                // A mistaken tap: back to where they were, with no message.
+                Dictation.Result.Discarded -> {
+                    lastFailedId = null
+                    render(reviewOrIdle())
                 }
                 is Dictation.Result.Failed -> {
                     // The keyboard offers an immediate retry, and the

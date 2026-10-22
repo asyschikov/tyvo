@@ -199,10 +199,11 @@ class Polisher(
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
         const val DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-        // 8B rather than 3B: clean-up is a short call either way, and the
-        // extra capacity shows on the corrections that matter -- the 3B
-        // measurably drops spoken corrections once a few are enabled at once.
-        const val DEFAULT_MISTRAL_MODEL = "ministral-8b-latest"
+        // Small 4, pinned rather than mistral-small-latest, which can move
+        // under us. On the clean-up eval it ties Ministral 8B in English
+        // (60/68) with fewer swapped words, and leads in German, Dutch and
+        // Russian (49/66 against 44/66).
+        const val DEFAULT_MISTRAL_MODEL = "mistral-small-2603"
 
         const val DEFAULT_XAI_MODEL = "grok-4.20-0309-non-reasoning"
         const val DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"

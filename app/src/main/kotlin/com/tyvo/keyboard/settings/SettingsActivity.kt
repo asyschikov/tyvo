@@ -206,6 +206,7 @@ private fun SettingsScreen(
     var notifyOnFail by remember { mutableStateOf(settings.failureNotifications) }
     var toastOnFail by remember { mutableStateOf(settings.failureToasts) }
     var keepFailed by remember { mutableStateOf(settings.keepFailedAudio) }
+    var discardSilence by remember { mutableStateOf(settings.discardShortSilence) }
     var corrections by remember { mutableStateOf(settings.corrections()) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
@@ -497,10 +498,8 @@ private fun SettingsScreen(
                     corrections.size > Correction.defaults.size
                 if (heavy) {
                     Text(
-                        "Extras crowd out the others on the smallest models: " +
-                            "measured on Ministral 3B, spoken corrections go " +
-                            "from always applied to rarely. Ministral 8B, the " +
-                            "default, handles all of them.",
+                        "Extras can crowd out the others on the smallest " +
+                            "models: spoken corrections may stop being applied.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -596,6 +595,17 @@ private fun SettingsScreen(
                 "Names and jargon it keeps mishearing. A nudge, not a rule.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // ---- recordings ----------------------------------------------------
+        SectionCard("Recordings") {
+            ToggleRow(
+                checked = discardSilence,
+                onChange = { discardSilence = it; settings.discardShortSilence = it },
+                title = "Drop short silent clips",
+                subtitle = "Under 3 seconds with no words heard: not saved, no message. " +
+                    "Off: kept in Tyvo as \"Nothing heard\".",
             )
         }
 

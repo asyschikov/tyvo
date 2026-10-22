@@ -130,11 +130,11 @@ rejected as non-functional, and Mistral gates some models by account tier.
 ```sh
 curl -sf https://api.mistral.ai/v1/audio/transcriptions \
   -H "Authorization: Bearer $KEY" \
-  -F file=@clip.m4a -F model=voxtral-mini-latest
+  -F file=@clip.m4a -F model=voxtral-small-transcribe-3
 
 curl -sf https://api.mistral.ai/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"model":"ministral-8b-latest","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"mistral-small-2603","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 Both must return 200 — the reviewer exercises both stages.
