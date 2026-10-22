@@ -38,6 +38,15 @@ object KeyboardColors {
     val BG_LIGHT: Int = Color.parseColor("#ECEEF2")
 }
 
+/** Fallback pads shown instead of the voice UI when voice does not fit the field. */
+enum class PadKind {
+    /** Digits and the separators number, phone and date/time fields use. */
+    NUMERIC,
+
+    /** A compact QWERTY with a digits/symbols layer. */
+    TEXT,
+}
+
 @SuppressLint("ViewConstructor")
 class KeyboardView(context: Context) : LinearLayout(context) {
 
@@ -67,6 +76,12 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     var onSpace: () -> Unit = {}
     var onEnableBubble: () -> Unit = {}
 
+    /** A character key on a fallback pad. */
+    var onPadKey: (String) -> Unit = {}
+
+    /** Enter on a fallback pad: the field's own action, not a raw newline. */
+    var onEnter: () -> Unit = {}
+
     /**
      * Offer the floating mic in the idle strip. Set by the IME before each
      * render, since the switch for it lives in system settings.
@@ -81,9 +96,34 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private val undoButton: TextView
     private val doneButton: TextView
     private val controls: LinearLayout
+    private val padView: LinearLayout
 
     /** True while the mic button is standing in as the setup prompt. */
     private var micIsSetupPrompt = false
+
+    /**
+     * Fallback pad shown instead of the voice UI, or null for the voice UI.
+     * Set by the IME from the field's context.
+     */
+    var pad: PadKind? = null
+        set(value) {
+            val changed = field != value
+            field = value
+            if (value != null) {
+                if (changed) {
+                    shiftOn = false
+                    symbolsOn = false
+                }
+                buildPad(value)
+            }
+            applyChrome()
+        }
+
+    /** One-shot shift on the text pad: the next letter only. */
+    private var shiftOn = false
+
+    /** Digits/symbols layer of the text pad, off the letters. */
+    private var symbolsOn = false
 
     init {
         orientation = VERTICAL
@@ -166,6 +206,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         controls.addView(back, lp(dp(52), dp(56)).also { it.leftMargin = dp(6) })
 
         addView(controls, lp(MATCH, WRAP))
+
+        // --- fallback pad -----------------------------------------------------
+        // Built per pad kind when the IME sets [pad]; see buildPad.
+        padView = LinearLayout(context).apply {
+            orientation = VERTICAL
+            visibility = GONE
+        }
+        addView(padView, lp(MATCH, WRAP))
     }
 
 
@@ -184,6 +232,12 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         // dims and locks mid-sentence cuts the dictation short.
         keepScreenOn = state is UiState.Recording
         holdDeletesStaged = state is UiState.Review
+        // The fallback pad replaces the voice surface entirely; only the
+        // status line (and the waveform while recording) still react to state.
+        if (pad != null) {
+            renderPadStatus(state)
+            return
+        }
         when (state) {
             is UiState.NeedsSetup -> {
                 // Only the mic changes. Space, newline, backspace and the
@@ -246,9 +300,192 @@ class KeyboardView(context: Context) : LinearLayout(context) {
         }
     }
 
+    /**
+     * Pad mode: only the status line (and the waveform while recording)
+     * react to state. The pad works without an API key, so an unconfigured
+     * keyboard still types here -- the hint says why there is no mic.
+     */
+    private fun renderPadStatus(state: UiState) {
+        when (state) {
+            is UiState.Recording -> {
+                setStatus("Listening   ${fmt(state.elapsedMs)}", c.rec)
+                waveform.visibility = VISIBLE
+            }
+
+            is UiState.Working -> {
+                setStatus("${state.step}…", c.fgDim)
+                waveform.visibility = GONE
+            }
+
+            is UiState.Review -> {
+                setStatus(state.note, if (state.busy) c.fgDim else c.warn)
+                waveform.visibility = GONE
+            }
+
+            is UiState.NeedsSetup -> {
+                setStatus(state.reason, c.fgDim)
+                waveform.visibility = GONE
+            }
+
+            is UiState.Idle -> {
+                if (state.lastError != null) setStatus(state.lastError, c.warn)
+                else setStatus(padHint(), c.fgDim)
+                waveform.visibility = GONE
+            }
+        }
+    }
+
+    private fun padHint(): String = when (pad) {
+        PadKind.NUMERIC -> "Number pad · voice is off in number fields"
+        PadKind.TEXT -> "Keys · voice is off in this field"
+        null -> ""
+    }
+
+    /** Shows the fallback pad, or the voice UI when there is none. */
+    private fun applyChrome() {
+        val padOn = pad != null
+        padView.visibility = if (padOn) VISIBLE else GONE
+        actionScroll.visibility = if (padOn) GONE else VISIBLE
+        controls.visibility = if (padOn) GONE else VISIBLE
+        if (padOn) waveform.visibility = GONE
+    }
+
+    // ---- fallback pads ---------------------------------------------------
+
+    private fun buildPad(kind: PadKind) {
+        padView.removeAllViews()
+        when (kind) {
+            PadKind.NUMERIC -> buildNumericPad()
+            PadKind.TEXT -> buildTextPad()
+        }
+    }
+
+    private fun rebuildPad() {
+        pad?.let { buildPad(it) }
+    }
+
+    /**
+     * Digits plus the separators number, phone and date/time fields actually
+     * use. The rarer symbols (*, #, :, /) are one globe key away, on the
+     * user's own keyboard.
+     */
+    private fun buildNumericPad() {
+        listOf(
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
+            listOf(".", ",", "-", "+"),
+        ).forEach { labels ->
+            padView.addView(keyRow().apply {
+                labels.forEach { key(it) }
+            }, rowLp())
+        }
+        padView.addView(padControlRow(), rowLp())
+    }
+
+    /**
+     * A compact QWERTY for search, password and URI fields: one-shot shift,
+     * and a ?123 layer for digits and the symbols passwords tend to demand.
+     */
+    private fun buildTextPad() {
+        if (symbolsOn) {
+            padView.addView(keyRow().apply {
+                "1234567890".forEach { key(it.toString()) }
+            }, rowLp())
+            padView.addView(keyRow().apply {
+                listOf("@", "#", "$", "%", "&", "*", "-", "+", "(", ")")
+                    .forEach { key(it) }
+            }, rowLp())
+            padView.addView(keyRow().apply {
+                listOf("!", "?", "'", "\"", ":", ";", "/", "_")
+                    .forEach { key(it) }
+            }, rowLp())
+        } else {
+            val letters =
+                if (shiftOn) "QWERTYUIOPASDFGHJKLZXCVBNM" else "qwertyuiopasdfghjklzxcvbnm"
+            padView.addView(keyRow().apply {
+                letters.take(10).forEach { key(it.toString()) { typeLetter(it) } }
+            }, rowLp())
+            padView.addView(keyRow().apply {
+                letters.substring(10, 19).forEach { key(it.toString()) { typeLetter(it) } }
+            }, rowLp())
+            padView.addView(keyRow().apply {
+                key(if (shiftOn) "⇪" else "⇧", weight = 1.3f) {
+                    shiftOn = !shiftOn
+                    rebuildPad()
+                }
+                letters.substring(19).forEach { key(it.toString()) { typeLetter(it) } }
+            }, rowLp())
+        }
+        // Bottom row: the layer toggle, space, and the two punctuation keys
+        // an address or a sentence usually needs.
+        padView.addView(keyRow().apply {
+            key(if (symbolsOn) "ABC" else "?123", weight = 1.4f) {
+                symbolsOn = !symbolsOn
+                rebuildPad()
+            }
+            key("space", weight = 3.5f) { onSpace() }
+            key(",")
+            key(".")
+        }, rowLp())
+        padView.addView(padControlRow(), rowLp())
+    }
+
+    /** Emits a letter, then drops one-shot shift so the next one is lower-case. */
+    private fun typeLetter(displayed: Char) {
+        onPadKey(displayed.toString())
+        if (shiftOn) {
+            shiftOn = false
+            rebuildPad()
+        }
+    }
+
+    /** Globe, repeating backspace, enter -- shared by both pads. */
+    private fun padControlRow(): LinearLayout =
+        keyRow().apply {
+            addView(pill("⌨", accent = false) { onSwitchKeyboard() }, lp(dp(52), dp(KEY_H)))
+            addView(
+                repeatingPill("⌫") { byWord -> onBackspace(byWord) },
+                LayoutParams(0, dp(KEY_H), 1f).also {
+                    it.leftMargin = dp(6)
+                    it.rightMargin = dp(6)
+                }
+            )
+            addView(pill("⏎", accent = true) { onEnter() }, lp(dp(52), dp(KEY_H)).also {
+                it.leftMargin = dp(6)
+            })
+        }
+
+    private fun keyRow(): LinearLayout =
+        LinearLayout(context).apply { orientation = HORIZONTAL }
+
+    /** Adds a character key to this row; defaults to emitting [label]. */
+    private fun LinearLayout.key(
+        label: String,
+        weight: Float = 1f,
+        onTap: () -> Unit = { onPadKey(label) },
+    ) {
+        addView(padKey(label) { onTap() }, LayoutParams(0, dp(KEY_H), weight).also {
+            it.leftMargin = dp(3)
+            it.rightMargin = dp(3)
+        })
+    }
+
+    private fun padKey(label: String, onTap: () -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextColor(c.fg)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            background = roundedDrawable(c.surface, dp(10).toFloat())
+            isClickable = true
+            setOnClickListener { onTap() }
+        }
+
+    private fun rowLp() = lp(MATCH, WRAP).also { it.bottomMargin = dp(6) }
+
     /** Shows [text], or collapses the line entirely when there is nothing to say. */
-    private fun setStatus(text: String?, color: Int) {
-        if (text.isNullOrBlank()) {
+    private fun setStatus(text: String?, color: Int) {        if (text.isNullOrBlank()) {
             status.visibility = GONE
         } else {
             status.visibility = VISIBLE
@@ -442,6 +679,9 @@ class KeyboardView(context: Context) : LinearLayout(context) {
     private companion object {
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
+
+        /** Height of one fallback-pad key row. */
+        const val KEY_H = 48
 
         const val FIRST_REPEAT_DELAY_MS = 400L
         const val CHAR_REPEAT_MS = 55L

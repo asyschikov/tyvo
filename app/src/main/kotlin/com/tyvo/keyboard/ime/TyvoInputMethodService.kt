@@ -19,6 +19,8 @@ import com.tyvo.keyboard.audio.AudioRecorder
 import com.tyvo.keyboard.bubble.isBubbleEnabled
 import android.content.res.Configuration
 import androidx.core.view.WindowInsetsControllerCompat
+import com.tyvo.keyboard.data.ContextBehavior
+import com.tyvo.keyboard.data.InputContext
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.history.Maintenance
 import com.tyvo.keyboard.history.RecordingStore
@@ -29,6 +31,7 @@ import com.tyvo.keyboard.settings.SettingsActivity
 import com.tyvo.keyboard.transcribe.Transcriber
 import com.tyvo.keyboard.ui.KeyboardColors
 import com.tyvo.keyboard.ui.KeyboardView
+import com.tyvo.keyboard.ui.PadKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -68,6 +71,13 @@ class TyvoInputMethodService : InputMethodService() {
 
     private val session = DictationSession()
     private var view: KeyboardView? = null
+
+    /**
+     * True when the active subtype is the voice one: another keyboard
+     * launched us from its mic key, so the UI is compact and the keyboard
+     * returns to that keyboard once text lands or the user cancels.
+     */
+    private var voiceMode = false
 
     private var pipeline: Job? = null
 
@@ -119,6 +129,8 @@ class TyvoInputMethodService : InputMethodService() {
         v.onNewline = { commitLiteral("\n") }
         v.onSpace = { commitLiteral(" ") }
         v.onEnableBubble = { openBubbleSetup() }
+        v.onPadKey = { commitLiteral(it) }
+        v.onEnter = { performEnter() }
         view = v
         render(UiState.Idle())
         return v
@@ -168,16 +180,59 @@ class TyvoInputMethodService : InputMethodService() {
             session.clear()
             committed = ""
         }
+        val yielded = applyContext(info)
         val pending = pendingInsert
-        if (pending != null && !isLocked()) {
+        if (!yielded && pending != null && !isLocked()) {
             pendingInsert = null
             commitFresh(pending.text, transcript = pending.raw)
             render(reviewOrIdle(note = pending.note))
         } else if (pipeline?.isActive != true) {
             // Mid-transcription the status line is still telling the truth.
-            render(stateForIdle())
+            render(idleStateForMode())
         }
     }
+
+    /**
+     * Adapts the keyboard to the field it is in front of.
+     *
+     * Returns true when the field is handed straight back to the previous
+     * keyboard (ContextBehavior.YIELD): there is nothing left to show or
+     * commit here.
+     */
+    private fun applyContext(info: EditorInfo?): Boolean {
+        val v = view ?: return false
+        val context = info?.let { InputContext.of(it.inputType, it.imeOptions) }
+            ?: InputContext.TEXT
+        return when (InputContext.behaviorFor(
+            context,
+            numeric = settings.numericBehavior,
+            search = settings.searchBehavior,
+            password = settings.passwordBehavior,
+            uri = settings.uriBehavior,
+        )) {
+            ContextBehavior.VOICE -> {
+                v.pad = null
+                false
+            }
+            ContextBehavior.FALLBACK -> {
+                v.pad = if (context == InputContext.NUMERIC) PadKind.NUMERIC else PadKind.TEXT
+                false
+            }
+            ContextBehavior.YIELD -> {
+                v.pad = null
+                switchAway()
+                true
+            }
+        }
+    }
+
+    /**
+     * The idle state for the current UI mode. A fallback pad types without
+     * an API key, so an unconfigured keyboard still gets the pad rather
+     * than the setup prompt.
+     */
+    private fun idleStateForMode(): UiState =
+        if (view?.pad != null) UiState.Idle() else stateForIdle()
 
     /**
      * Re-checks setup whenever the keyboard comes back up.
@@ -196,7 +251,7 @@ class TyvoInputMethodService : InputMethodService() {
         // Only while idle: re-rendering mid-session would throw away a review
         // the user is still working with.
         if (!session.isActive && pipeline?.isActive != true) {
-            render(stateForIdle())
+            render(idleStateForMode())
         }
     }
 
@@ -442,6 +497,14 @@ class TyvoInputMethodService : InputMethodService() {
         session.clear()
         committed = ""
         render(UiState.Idle())
+    }
+
+    /**
+     * Enter on a fallback pad: the field's own action (Search, Go, Done…)
+     * rather than a raw newline, so the pad behaves like a real keyboard's.
+     */
+    private fun performEnter() {
+        if (!sendDefaultEditorAction(true)) commitLiteral("\n")
     }
 
     // ---- Text commit ----------------------------------------------------

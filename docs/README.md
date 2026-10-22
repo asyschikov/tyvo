@@ -184,6 +184,23 @@ copied for you to paste.
 Recordings go through the same store as the keyboard's, so a failed dictation
 from the bubble waits in History like any other.
 
+## Fields where voice does not fit
+
+The keyboard looks at the field before deciding what to be. Number, phone
+and date/time fields get a number pad; search boxes, password fields and web
+addresses get compact text keys — a small QWERTY with one-shot shift and a
+digits/symbols layer. The pad's Enter sends the field's own action (Search,
+Go, Done), so a search box behaves as if its button was tapped, and the
+globe key switches to your usual keyboard for the rare character the pad
+does not have.
+
+For each of the four contexts — numeric, search, password, URI — Settings
+offers three choices: **Voice**, **Keys**, or **Switch away**, which hands the
+field straight back to the previous keyboard. Keys is the default everywhere:
+a keyboard that has handed the field away is no longer active and cannot
+switch itself back on the next field. Text fields always dictate; there is
+no setting for them.
+
 ## Nothing is lost
 
 A failed transcription used to destroy the recording, so the words were simply
@@ -329,12 +346,11 @@ latency", where the latency gain implies detection is genuinely skipped.
 Tyvo sends it to both anyway: it costs one form field, and it will take effect
 on Mistral if that ever changes.
 
-There is also no way to recover from a mis-detection after the fact. The
-response's `language` field is always `null` (even with no
-`timestamp_granularities`, the one documented incompatibility), so there is no
-detection result to branch on — and re-transcribing with a forced hint
-provably returns identical text. A "detect the language during clean-up and
-retry" path would have nothing to trigger it and nothing to fix.
+The response's `language` field is `null` by default. Mistral fills it only
+when the request sends `return_language=true`, a field its API docs leave out;
+with it, every Voxtral model tested named the language correctly. Tyvo does
+not send it yet. Re-transcribing with a forced hint returns identical text, so
+a detected language is useful for choosing the clean-up, not for a retry.
 
 ## Build
 
@@ -390,7 +406,7 @@ Verified working on a Pixel 10 (Android 17):
 - Live HTTPS calls to Mistral; errors surface as readable text
 - WAV format accepted by the transcription endpoint (HTTP 200)
 - Clean-up prompt: 8/8 on a tricky-transcript suite against the real API
-- 85 unit tests
+- 116 unit tests
 
 Not yet verified end to end: speaking into the mic and getting polished text
 back. Every part of that path is verified on its own; nobody has yet held the

@@ -17,6 +17,7 @@ a heavy day costs cents, a quiet week costs nothing.
 - **Dictation with clean-up** — raw text first, polished text swapped in
 - **Quick actions** — proofread, tone and length rewrites from the review strip
 - **Floating mic** — dictate into any field, with your usual keyboard
+- **Context-aware fields** — number pad for numeric fields; keys for search, passwords, addresses
 - **History** — every dictation kept; failed ones retryable, with their audio
 - **Four providers** — Mistral, OpenAI, Gemini, xAI; one key each
 - **Switchable corrections** — spoken fixes, fillers, punctuation, grammar
@@ -44,6 +45,14 @@ keyboard is up, so you can dictate into any field without switching
 keyboards. Tap to dictate at the cursor, hold for the review strip. Password
 fields are skipped, and it stays out of the way when Tyvo's own keyboard is
 showing.
+
+### Context-aware fields
+
+Voice does not fit every field. Number, phone and date/time fields get a
+number pad; search boxes, password fields and web addresses get compact text
+keys. Each context is configurable — voice, keys, or handing the field back
+to your usual keyboard. The pad is the default: a keyboard that has handed
+the field away cannot switch itself back on the next one.
 
 ### History
 
