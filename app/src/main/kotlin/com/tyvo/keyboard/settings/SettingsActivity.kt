@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.data.BubbleOpacity
@@ -654,6 +655,16 @@ private fun SettingsScreen(
                     "Off: kept in Tyvo as \"Nothing heard\".",
             )
         }
+
+        // The version, muted, at the very bottom: a screenshot of the
+        // settings screen says which build it came from.
+        Text(
+            "Tyvo ${BuildConfig.VERSION_NAME}",
+            Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         // Leaves room for the floating button to sit over dead space
         // rather than over the last setting.
