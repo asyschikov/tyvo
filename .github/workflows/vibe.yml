@@ -16,8 +16,13 @@ on:
     types: [submitted]
 
 # One run at a time per issue or PR; a comment made mid-run waits its turn.
+# Anyone else's comment still creates a run (it is skipped at the gate), so
+# it gets a group of its own: a queue holds one pending run, and strangers'
+# runs must never push the owner's out of it.
 concurrency:
-  group: vibe-${{ github.event.issue.number || github.event.pull_request.number }}
+  group: >-
+    vibe-${{ github.event.issue.number || github.event.pull_request.number }}-${{
+      github.actor == github.repository_owner && 'owner' || github.run_id }}
   cancel-in-progress: false
 
 permissions: {}
