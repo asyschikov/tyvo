@@ -1,0 +1,234 @@
+name: Vibe
+
+# A coding agent (Mistral Vibe) that works issues into pull requests. Write
+# @tyvo-bot in an issue comment to start it; after that, every comment or
+# review you leave on its PR is more work for it. See .github/vibe/.
+#
+# Three jobs, split by what they are trusted with:
+#   gate     reads the event and the thread, decides whether to run
+#   agent    runs Vibe and an emulator; read-only token, Mistral key only
+#   publish  pushes, opens the PR, signs the APK; never runs agent code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+# One run at a time per issue or PR; a comment made mid-run waits its turn.
+concurrency:
+  group: vibe-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  gate:
+    # The repo is public: only the owner can spend the Mistral key. The gate
+    # script checks again; it also decides whether an owner's comment is for
+    # the bot (tagged, on a vibe PR, or answering the bot's question).
+    if: >-
+      (github.event_name == 'issue_comment'
+        && github.event.comment.user.login == github.repository_owner)
+      || (github.event_name == 'pull_request_review'
+        && github.event.review.user.login == github.repository_owner
+        && github.event.review.state != 'approved'
+        && startsWith(github.event.pull_request.head.ref, 'vibe/'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write          # the 👀 reaction
+      pull-requests: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+      issue: ${{ steps.gate.outputs.issue }}
+      pr: ${{ steps.gate.outputs.pr }}
+      branch: ${{ steps.gate.outputs.branch }}
+      exists: ${{ steps.gate.outputs.exists }}
+      version: ${{ steps.gate.outputs.version }}
+    steps:
+      # Always the default branch's scripts: a review event runs this file
+      # from the PR, but the PR cannot change what the scripts do.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/vibe
+          persist-credentials: false
+
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTEXT_DIR: ${{ runner.temp }}/context
+        run: bash .github/vibe/gate.sh
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: vibe-context
+          path: ${{ runner.temp }}/context/
+          retention-days: 7
+
+  agent:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      VIBE_OUT: ${{ github.workspace }}/repo/.vibe-out
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: repo
+          ref: ${{ needs.gate.outputs.exists == 'true' && needs.gate.outputs.branch || github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/checkout@v5
+        with:
+          path: bot
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/vibe
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: vibe-context
+          path: ${{ env.VIBE_OUT }}
+
+      - name: Note the starting point
+        working-directory: repo
+        run: |
+          echo "START_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo .vibe-out >> .git/info/exclude
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install Mistral Vibe
+        run: uv tool install mistral-vibe==2.26.1
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Vibe with an emulator up
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          VIBE_CONTEXT: ${{ env.VIBE_OUT }}/context.md
+          VIBE_MAX_TURNS: ${{ vars.VIBE_MAX_TURNS || '200' }}
+          VIBE_MAX_PRICE: ${{ vars.VIBE_MAX_PRICE || '5' }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          working-directory: repo
+          script: bash ../bot/.github/vibe/agent.sh
+
+      # The APK is built here, unsigned, and signed in publish: building runs
+      # the agent's Gradle code, and that must never meet the release key.
+      - name: Unit tests and release build
+        id: build
+        continue-on-error: true
+        working-directory: repo
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          ./gradlew :app:testDebugUnitTest :app:assembleRelease \
+            -PversionNameOverride="$VERSION"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$VIBE_OUT/"
+
+      - name: Collect the changes
+        working-directory: repo
+        run: |
+          git add -A
+          git diff --cached --binary "$START_SHA" > "$VIBE_OUT/changes.patch"
+          git diff --cached --stat "$START_SHA"
+          echo '${{ steps.build.outcome }}' > "$VIBE_OUT/build-outcome"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: vibe-out
+          path: |
+            ${{ env.VIBE_OUT }}/changes.patch
+            ${{ env.VIBE_OUT }}/title.txt
+            ${{ env.VIBE_OUT }}/summary.md
+            ${{ env.VIBE_OUT }}/question.md
+            ${{ env.VIBE_OUT }}/build-outcome
+            ${{ env.VIBE_OUT }}/screenshots/
+            ${{ env.VIBE_OUT }}/app-release-unsigned.apk
+          retention-days: 7
+
+  publish:
+    needs: [gate, agent]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # push the branch, screenshots and preview release
+      pull-requests: write
+      issues: write
+      actions: write         # start CI on the bot's branch
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: repo
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - uses: actions/checkout@v5
+        with:
+          path: bot
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/vibe
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: vibe-out
+          path: ${{ runner.temp }}/vibe-out
+
+      - name: Commit, open the PR, sign the APK, report
+        working-directory: repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ runner.temp }}/vibe-out
+          ISSUE: ${{ needs.gate.outputs.issue }}
+          PR: ${{ needs.gate.outputs.pr }}
+          BRANCH: ${{ needs.gate.outputs.branch }}
+          EXISTS: ${{ needs.gate.outputs.exists }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TYVO_KEYSTORE_BASE64: ${{ secrets.TYVO_KEYSTORE_BASE64 }}
+          TYVO_KEYSTORE_PASSWORD: ${{ secrets.TYVO_KEYSTORE_PASSWORD }}
+          TYVO_KEY_PASSWORD: ${{ secrets.TYVO_KEY_PASSWORD }}
+          TYVO_KEY_ALIAS: ${{ secrets.TYVO_KEY_ALIAS }}
+        run: |
+          BUILD=$(cat "$OUT/build-outcome")
+          export BUILD
+          bash ../bot/.github/vibe/publish.sh
+
+  report-failure:
+    needs: [gate, agent, publish]
+    if: failure() && needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.gate.outputs.pr || needs.gate.outputs.issue }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh issue comment "$NUMBER" -R "$GITHUB_REPOSITORY" --body "The vibe run failed and nothing was pushed. [Run log]($RUN_URL)"

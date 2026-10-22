@@ -77,6 +77,17 @@ android {
     }
 }
 
+// The vibe bot names its PR builds after the latest release plus the PR's
+// slug (0.5.0-dark-mode), passed as -PversionNameOverride. Without the
+// property every build keeps the versionName above.
+androidComponents {
+    onVariants { variant ->
+        providers.gradleProperty("versionNameOverride").orNull?.let { name ->
+            variant.outputs.forEach { it.versionName.set(name) }
+        }
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
