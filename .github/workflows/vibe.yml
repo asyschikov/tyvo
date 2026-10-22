@@ -162,6 +162,7 @@ jobs:
           VIBE_CONTEXT: ${{ env.VIBE_OUT }}/context.md
           VIBE_MAX_TURNS: ${{ vars.VIBE_MAX_TURNS || '200' }}
           VIBE_MAX_PRICE: ${{ vars.VIBE_MAX_PRICE || '5' }}
+          VIBE_MAX_TOKENS: ${{ vars.VIBE_MAX_TOKENS || '20000000' }}
         with:
           api-level: 34
           target: google_apis
@@ -198,6 +199,7 @@ jobs:
             ${{ env.VIBE_OUT }}/title.txt
             ${{ env.VIBE_OUT }}/summary.md
             ${{ env.VIBE_OUT }}/question.md
+            ${{ env.VIBE_OUT }}/usage.json
             ${{ env.VIBE_OUT }}/build-outcome
             ${{ env.VIBE_OUT }}/screenshots/
             ${{ env.VIBE_OUT }}/app-release-unsigned.apk
@@ -246,6 +248,8 @@ jobs:
           TYVO_KEYSTORE_PASSWORD: ${{ secrets.TYVO_KEYSTORE_PASSWORD }}
           TYVO_KEY_PASSWORD: ${{ secrets.TYVO_KEY_PASSWORD }}
           TYVO_KEY_ALIAS: ${{ secrets.TYVO_KEY_ALIAS }}
+          # Only to check the agent's output does not contain it.
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
           BUILD=$(cat "$OUT/build-outcome")
           export BUILD
