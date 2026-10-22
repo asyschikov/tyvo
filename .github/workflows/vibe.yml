@@ -67,7 +67,7 @@ jobs:
         run: bash .github/vibe/gate.sh
 
       - if: steps.gate.outputs.run == 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: vibe-context
           path: ${{ runner.temp }}/context/
@@ -99,7 +99,7 @@ jobs:
           sparse-checkout: .github/vibe
           persist-credentials: false
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: vibe-context
           path: ${{ env.VIBE_OUT }}
@@ -133,7 +133,7 @@ jobs:
       # 1 GB download and the cold boot. Bump the key to rebuild them.
       - name: Emulator cache
         id: avd-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
@@ -190,7 +190,7 @@ jobs:
           git diff --cached --stat "$START_SHA"
           echo '${{ steps.build.outcome }}' > "$VIBE_OUT/build-outcome"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: vibe-out
           path: |
@@ -225,7 +225,7 @@ jobs:
           sparse-checkout: .github/vibe
           persist-credentials: false
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: vibe-out
           path: ${{ runner.temp }}/vibe-out
