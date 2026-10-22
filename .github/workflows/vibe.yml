@@ -117,7 +117,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
 
       - name: Install Mistral Vibe
-        run: uv tool install mistral-vibe==2.26.1
+        run: uv tool install mistral-vibe==3.0.2
 
       - name: Enable KVM
         run: |

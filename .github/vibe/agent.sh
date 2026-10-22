@@ -17,9 +17,18 @@ sed -e "s|{{OUT}}|$VIBE_OUT|g" \
 adb wait-for-device
 
 # The task goes in a file, not on the command line: an issue with a long
-# thread can outgrow the kernel's limit on a single argument.
+# thread can outgrow the kernel's limit on a single argument. The session
+# export goes outside the repo and outside the uploaded artifact.
+SESSION="$RUNNER_TEMP/vibe-session"
+status=0
 vibe --trust --auto-approve \
     --max-turns "${VIBE_MAX_TURNS:-200}" \
     --max-price "${VIBE_MAX_PRICE:-5}" \
-    -p "Your task is described in $VIBE_OUT/task.md. Read it first and follow it." \
-    < /dev/null
+    --output-dir "$SESSION" \
+    --prompt-file "$VIBE_OUT/task.md" \
+    < /dev/null || status=$?
+
+# Cost, tokens and why it stopped, for the log. The effective config is
+# left out in case it ever carries a credential.
+jq 'with_entries(select(.key | test("config") | not))' "$SESSION/export.json" || true
+exit "$status"
