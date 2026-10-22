@@ -16,6 +16,7 @@ import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.polish.Polisher
+import com.tyvo.keyboard.ui.SubScreenBar
 import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -98,23 +99,24 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
         defaultChanged = false
     }
 
+    Scaffold(
+        topBar = {
+            SubScreenBar("Clean-up prompt", onBack) {
+                if (modified) ModifiedBadge("Modified")
+                Spacer(Modifier.width(12.dp))
+            }
+        },
+    ) { padding ->
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(padding)
+            .consumeWindowInsets(padding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack) { Text("‹ Back") }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Clean-up prompt",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.weight(1f),
-            )
-            if (modified) ModifiedBadge("Modified")
-        }
         Text(
             "The full instruction sent with every dictation. While you use your " +
                 "own, the Corrections and Your rules settings are not applied.",
@@ -182,6 +184,7 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
         TryBox(settings) { cleanUp(it, system = text) }
 
         Spacer(Modifier.height(72.dp))
+    }
     }
 }
 

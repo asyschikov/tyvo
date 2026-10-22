@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.tyvo.keyboard.ui.SubScreenBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,15 +33,11 @@ fun UsageScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Usage") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
-                actions = {
-                    if (rows.isNotEmpty()) {
-                        TextButton(onClick = { confirmClear = true }) { Text("Reset") }
-                    }
-                },
-            )
+            SubScreenBar("Usage", onBack) {
+                if (rows.isNotEmpty()) {
+                    TextButton(onClick = { confirmClear = true }) { Text("Reset") }
+                }
+            }
         },
     ) { padding ->
         if (rows.isEmpty()) {

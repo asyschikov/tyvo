@@ -63,6 +63,7 @@ import com.tyvo.keyboard.polish.Correction
 import com.tyvo.keyboard.polish.Polisher
 import com.tyvo.keyboard.transcribe.Transcriber
 import com.tyvo.keyboard.ui.FeedbackButton
+import com.tyvo.keyboard.ui.SubScreenBar
 
 /** Which of the app's screens is showing. */
 private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE, PROMPT }
@@ -257,19 +258,17 @@ private fun SettingsScreen(
         ActivityResultContracts.RequestPermission()
     ) { notifyGranted = it }
 
-    Box(Modifier.fillMaxSize()) {
+    Scaffold(topBar = { SubScreenBar("Settings", onBack) }) { padding ->
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(padding)
+            .consumeWindowInsets(padding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("‹ Back") }
-        }
-        Text("Settings", style = MaterialTheme.typography.headlineMedium)
 
         readiness.problem?.let { problem ->
             Card(
