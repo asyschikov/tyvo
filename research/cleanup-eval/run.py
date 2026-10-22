@@ -10,7 +10,8 @@ from pathlib import Path
 
 import prompts
 import importlib, os
-CASES = importlib.import_module(os.environ.get('CASES', 'cases')).CASES
+CASES = [c for m in os.environ.get('CASES', 'cases').split(',')
+         for c in importlib.import_module(m).CASES]
 
 HERE = Path(__file__).parent
 KEY = os.environ.get("MISTRAL_API_KEY")

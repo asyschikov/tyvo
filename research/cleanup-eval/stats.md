@@ -353,3 +353,17 @@ generic+ on Mistral Small 4, 2026-10-22. Voxtral 3 still returns
 generic+            16/22   14/22  19/22    49       30       19           7
 per-language        17/22   19/22  19/22    55       35       20           0
 ```
+
+## e2e_lang
+
+End to end, 2026-10-22 (`e2e_lang.py`): every case in `cases.py` and
+`lang_cases.py` spoken with macOS `say`, transcribed by
+`voxtral-small-transcribe-3` with `return_language=true`, then cleaned up by
+`mistral-small-2603` with generic+ and with the native prompt for the
+reported language. Language reported right on 134/134.
+
+```
+                 English  German  Dutch  Russian  all 134  held-out 39  CASE
+generic+         52/60    17/22   21/22  25/30    115      33           0
+native           53/60    19/22   19/22  21/30    112      31           0
+```

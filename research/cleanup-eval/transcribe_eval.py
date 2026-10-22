@@ -47,22 +47,29 @@ def kept(hyp, phrase):
     return " " + " ".join(norm(phrase)) + " " in " " + " ".join(norm(hyp)) + " "
 
 
-def synthesize(audio_dir: Path):
+def synthesize_one(audio_dir: Path, cid, voice, text):
     audio_dir.mkdir(parents=True, exist_ok=True)
+    wav = audio_dir / f"{cid}.wav"
+    if wav.exists():
+        return
+    aiff = audio_dir / f"{cid}.aiff"
+    subprocess.run(["say", "-v", voice, "-o", str(aiff), text], check=True)
+    subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", str(aiff), str(wav)], check=True)
+    aiff.unlink()
+
+
+def synthesize(audio_dir: Path):
     for cid, voice, text, _ in CLIPS:
-        wav = audio_dir / f"{cid}.wav"
-        if wav.exists():
-            continue
-        aiff = audio_dir / f"{cid}.aiff"
-        subprocess.run(["say", "-v", voice, "-o", str(aiff), text], check=True)
-        subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", str(aiff), str(wav)], check=True)
-        aiff.unlink()
+        synthesize_one(audio_dir, cid, voice, text)
 
 
-def transcribe(model, wav: Path):
+def transcribe(model, wav: Path, return_language=False):
+    """`return_language` is undocumented; without it `language` is always null."""
     boundary = uuid.uuid4().hex
+    fields = {"model": model, **({"return_language": "true"} if return_language else {})}
     body = b"".join([
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n{model}\r\n".encode(),
+        *(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode()
+          for k, v in fields.items()),
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{wav.name}\"\r\n"
         "Content-Type: audio/wav\r\n\r\n".encode(), wav.read_bytes(), b"\r\n",
         f"--{boundary}--\r\n".encode(),

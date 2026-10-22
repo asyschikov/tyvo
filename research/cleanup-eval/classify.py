@@ -10,7 +10,8 @@ usage: python3 classify.py results/a.json [results/b.json ...] [-v]
 """
 import difflib, json, sys, collections
 import importlib, os
-CASES = importlib.import_module(os.environ.get('CASES', 'cases')).CASES
+CASES = [c for m in os.environ.get('CASES', 'cases').split(',')
+         for c in importlib.import_module(m).CASES]
 from run import words
 
 FILLER = {"um", "uh", "er", "erm", "ah", "hmm", "like"}

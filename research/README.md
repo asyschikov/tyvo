@@ -84,8 +84,15 @@ capitalisation (9/14 clean against 5/14, 0 lowercase outputs against 4).
 Re-run on Mistral Small 4 (October 2026, after it became the default):
 per-language prompts 55/66 clean against 49/66 for generic+, but 20/24
 against 19/24 on held-out cases. The whole gap is capitalisation: generic+
-left 7 outputs lowercase, 5 of them Dutch; per-language left none. Voxtral 3
-still returns `language: null`, so the transcriber cannot pick the prompt.
+left 7 outputs lowercase, 5 of them Dutch; per-language left none. The
+transcriber can pick the prompt: with the undocumented `return_language=true`
+it reports the language (see below).
+
+End to end, though, the gap is gone. Spoken through `say`, transcribed by
+Voxtral Small 3 (language reported right on 134/134) and cleaned up by
+Small 4, generic+ scored 115/134 and the native prompts 112/134; 33/39
+against 31/39 held out. Voxtral already capitalises and punctuates, so the
+lowercase failures the text-only cases provoked never arise. Generic+ stays.
 
 ### Written (heavy)
 
@@ -112,7 +119,12 @@ spoken numbers), once each (`transcribe_eval.py`):
 - All three models write spoken numbers as digits (ten → 10, "nine, I mean
   ten" → "9. I mean 10."). That accounts for most of the WER, equally across
   models.
-- `language` is null in every response, on v3 too.
+- `language` is null unless the request sends `return_language=true`, a
+  field the docs leave out (it showed up in a validation error's echo of the
+  request). With it, all three models named the language right on 13/13
+  clips: en, de, nl, ru.
+- The same echo shows a `verbatim` flag. On 5 clips it kept spoken numbers
+  as words ("nine. I mean ten") but also dropped a German "äh". Not adopted.
 - v3 accepts the app's `language` and repeated `context_bias` fields. Putting
   "щас" in `context_bias` made both v3 models keep it instead of writing
   "сейчас", so the app's vocabulary setting can protect slang.
@@ -128,8 +140,8 @@ spoken numbers), once each (`transcribe_eval.py`):
   tier.
 - **Voxtral normalises before clean-up ever runs**: "щас" → "сейчас",
   "ten" → "10".
-- **Mistral's transcription response has a `language` field, but it is always
-  null**, even when a language is passed in.
+- **Mistral's transcription response has a `language` field, null by
+  default.** It is filled only when the request sends `return_language=true`.
 - **The prompts were sent with a ragged 8-space margin**, because multi-line
   values were interpolated before `trimIndent()`. Fixed.
 
@@ -170,6 +182,7 @@ secretspec run -S research -- python3 heavy.py results/<light>.json ministral-8b
 | `classify.py` | sorts each word-level edit into acceptable or overreach |
 | `heavy.py` | runs the Written action on light output and checks tone, narration and corrections |
 | `transcribe_eval.py` | compares transcription models on synthesized clips (needs macOS `say`) |
+| `e2e_lang.py` | speaks every case, transcribes it with the language reported, and cleans it up with generic+ and the native prompt |
 | `variants/` | every prompt we tested: v1–v4, per-language, generic+, Written v2/v3 |
 | `stats.md` | per-run scores behind every number above; the raw outputs are not kept |
 
