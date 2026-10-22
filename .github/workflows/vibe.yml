@@ -82,6 +82,9 @@ jobs:
       contents: read
     env:
       VIBE_OUT: ${{ github.workspace }}/repo/.vibe-out
+      # Every build in this job is named for the preview, the agent's own
+      # installDebug included, so its screenshots show 0.5.0-<slug> too.
+      ORG_GRADLE_PROJECT_versionNameOverride: ${{ needs.gate.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -175,11 +178,8 @@ jobs:
         id: build
         continue-on-error: true
         working-directory: repo
-        env:
-          VERSION: ${{ needs.gate.outputs.version }}
         run: |
-          ./gradlew :app:testDebugUnitTest :app:assembleRelease \
-            -PversionNameOverride="$VERSION"
+          ./gradlew :app:testDebugUnitTest :app:assembleRelease
           cp app/build/outputs/apk/release/app-release-unsigned.apk "$VIBE_OUT/"
 
       - name: Collect the changes
