@@ -150,6 +150,24 @@ class QuickActionsTest {
     }
 
     @Test
+    fun `prompts carry no label word for the model to echo`() {
+        // A small model labels its output with a noun the prompt hands it:
+        // "message" in the framing came back at the start of every dictation,
+        // a word the speaker never said.
+        listOf(
+            Prompts.cleanUp(Correction.defaults),
+            Prompts.cleanUp(emptySet()),
+            Prompts.transform("Make it formal"),
+            Prompts.wrapInput("x"),
+        ).forEach { p ->
+            assertFalse(
+                "the prompt must not offer a label word to echo",
+                p.lowercase().contains("message"),
+            )
+        }
+    }
+
+    @Test
     fun `enabled corrections appear in the prompt and disabled ones do not`() {
         val only = Prompts.cleanUp(setOf(Correction.SPOKEN_EDITS))
         assertTrue(only.contains("SPOKEN CORRECTIONS"))
