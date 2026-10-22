@@ -24,9 +24,11 @@ object Prompts {
      * does. The reminder sits after the content because the end of a prompt
      * carries the most weight.
      *
-     * The framing also avoids naming what is being written with a noun the
-     * model can label its output with: "message" here once came back at the
-     * start of every dictation, a word the speaker never said.
+     * The framing names what is being written with a noun the model can
+     * label its output with: "message" here once came back at the start of
+     * every dictation, a word the speaker never said, and the "note" used
+     * now can come back the same way. Polisher.stripLabel removes a leading
+     * label the speaker did not say.
      */
     fun wrapInput(text: String): String = """
         <dictation>

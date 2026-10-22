@@ -204,29 +204,39 @@ class Polisher(
             .replace(Regex("\\s+,"), ",")
 
         /**
-         * Removes a leading "message" label the model put on its output.
+         * Removes a leading label the model put on its output: "message",
+         * and "note", which the prompts say where they once said "message".
          *
-         * The prompts no longer offer the word, but a small chat model
-         * labels its output with a noun anyway, and this was the one it
+         * The prompts no longer offer "message", but a small chat model
+         * labels its output with a noun anyway, and those were the two it
          * reached for: every dictation came back as "message I love tyvo",
          * a word the speaker never said. Only a leading label is removed,
          * and only when the transcript does not contain the word -- clean-up
-         * never adds words, so a "message" the speaker did not say was put
-         * there by the model. A dictation that really starts "message mom..."
+         * never adds words, so a label the speaker did not say was put there
+         * by the model. A dictation that really starts "note to self..."
          * keeps its first word, because a keyboard that quietly rewrites
          * your voice is worse than one that leaves a stray label in.
          */
         fun stripLabel(text: String, spoken: String): String {
-            if (!LEADING_LABEL.containsMatchIn(text)) return text
-            if (LABEL_SPOKEN.containsMatchIn(spoken)) return text
-            return LEADING_LABEL.replaceFirst(text, "")
+            var out = text
+            LABELS.forEach { (leading, spokenWord) ->
+                if (leading.containsMatchIn(out) && !spokenWord.containsMatchIn(spoken)) {
+                    out = leading.replaceFirst(out, "")
+                }
+            }
+            return out
         }
 
-        /** A leading "message" wearing the punctuation a label carries. */
-        private val LEADING_LABEL = Regex("(?i)^message\\b[\\s:,.!?;–—-]*")
-
-        /** The same word anywhere in what the speaker said. */
-        private val LABEL_SPOKEN = Regex("(?i)\\bmessage\\b")
+        /**
+         * The labels a small model puts on its output, each with the guard
+         * that keeps the speaker's own word: a leading "message" or "note"
+         * wearing the punctuation a label carries, and the same word
+         * anywhere in what the speaker said.
+         */
+        private val LABELS = listOf(
+            Regex("(?i)^message\\b[\\s:,.!?;–—-]*") to Regex("(?i)\\bmessage\\b"),
+            Regex("(?i)^note\\b[\\s:,.!?;–—-]*") to Regex("(?i)\\bnote\\b"),
+        )
 
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
