@@ -1,0 +1,22 @@
+name: Vibe cleanup
+
+# A closed vibe PR no longer needs its preview APK. The screenshots stay on
+# the vibe-assets branch, because the PR's comments still show them.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  cleanup:
+    if: startsWith(github.event.pull_request.head.ref, 'vibe/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: preview-pr-${{ github.event.pull_request.number }}
+        run: gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
