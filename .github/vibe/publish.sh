@@ -15,6 +15,22 @@ ASSETS=vibe-assets
 # gate.sh looks for this: the owner's reply to a marked comment needs no tag.
 QUESTION_MARK='<!-- vibe:question -->'
 
+# The agent may use the Mistral key to test the app. If it leaked into
+# anything about to be published, stop before any of it goes out.
+if [ -n "${MISTRAL_API_KEY:-}" ] \
+    && cat "$OUT"/changes.patch "$OUT"/*.md "$OUT"/*.txt 2>/dev/null | grep -qF "$MISTRAL_API_KEY"; then
+    echo "::error::The Mistral API key appears in the agent's output; refusing to publish." >&2
+    exit 1
+fi
+
+# "**Cost:** ~$4.07 (est.) · 14.6M tokens, 13.6M cached · 105 steps · 39 min"
+COST_LINE=$(jq -r '
+    "**Cost:** ~$\(.cost * 100 | round / 100)\(if .estimated then " (est.)" else "" end)"
+    + " · \(.tokens / 1e5 | round / 10)M tokens, \(.cached / 1e5 | round / 10)M cached"
+    + " · \(.steps) steps · \(.minutes) min"
+    + (if .stop_reason then " · stopped: \(.stop_reason)" else "" end)
+' "$OUT/usage.json" 2>/dev/null || echo "**Cost:** unknown")
+
 # The agent gave up and asked. Push nothing; ask where the work is happening.
 if [ -s "$OUT/question.md" ]; then
     {
@@ -24,6 +40,8 @@ if [ -s "$OUT/question.md" ]; then
         cat "$OUT/question.md"
         echo
         echo "_Reply here and I will pick it up from your answer; no need to tag me._"
+        echo
+        echo "$COST_LINE"
         echo
         echo "<sub>[Run log]($RUN_URL)</sub>"
     } > "$RUNNER_TEMP/question.md"
@@ -71,7 +89,8 @@ fi
 
 # Nothing pushed and no PR yet: the agent answered instead of changing code.
 if [ -z "$PR" ]; then
-    gh issue comment "$ISSUE" -R "$REPO" --body "$(printf '%s\n\n<sub>[Run log](%s)</sub>\n' "$SUMMARY" "$RUN_URL")"
+    gh issue comment "$ISSUE" -R "$REPO" \
+        --body "$(printf '%s\n\n%s\n\n<sub>[Run log](%s)</sub>\n' "$SUMMARY" "$COST_LINE" "$RUN_URL")"
     exit 0
 fi
 
@@ -148,6 +167,8 @@ fi
     echo
     [ -n "$APK_LINE" ] && { echo "$APK_LINE"; echo; }
     [ -n "$SHOTS" ] && { echo "### Screenshots"; echo; echo "$SHOTS"; echo; }
+    echo "$COST_LINE"
+    echo
     echo "<sub>[Run log]($RUN_URL)</sub>"
 } > "$RUNNER_TEMP/comment.md"
 gh pr comment "$PR" -R "$REPO" --body-file "$RUNNER_TEMP/comment.md"

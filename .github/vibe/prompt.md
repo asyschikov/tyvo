@@ -41,8 +41,8 @@ worth testing.
 ## Test on the emulator and take screenshots
 
 An Android emulator (API 34) is already running; `adb` talks to it. It has
-no microphone and no API key, so dictation cannot run. Show the screens your
-change touches instead.
+no microphone, so nothing can be recorded. Show the screens your change
+touches.
 
 ```sh
 ./gradlew :app:installDebug
@@ -71,6 +71,25 @@ what they show, for example `01-settings-new-toggle.png`:
 ```sh
 adb exec-out screencap -p > {{OUT}}/screenshots/01-settings-new-toggle.png
 ```
+
+### A Mistral API key, for testing
+
+`$MISTRAL_API_KEY` holds a real Mistral key, put there for you to test with.
+Use it to check that your change works against the real model, not just in
+unit tests:
+
+- Enter it into Tyvo on the emulator (Settings, Mistral as the provider) so
+  clean-up and the quick actions run for real. Type it with
+  `adb shell input text "$MISTRAL_API_KEY"`, so the value never passes
+  through your own output.
+- Call the Mistral API directly, for example to run a prompt you changed on
+  a few sample transcripts. The clean-up eval in `research/` reads the same
+  variable.
+
+The key must never leave this environment. Do not print it, echo it, write it
+into any file, or capture a screenshot while it is visible on screen. The API
+key field masks it, so take screenshots only after it is saved. A run whose
+output contains the key is thrown away.
 
 Two to six screenshots is right. Each one should show the change, not just
 that the app opens. Wait a second after a tap before you capture.
