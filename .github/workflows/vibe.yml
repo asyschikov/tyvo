@@ -126,6 +126,32 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # The system image and a booted AVD snapshot, so most runs skip the
+      # 1 GB download and the cold boot. Bump the key to rebuild them.
+      - name: Emulator cache
+        id: avd-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: avd-34-google_apis-x86_64-v1
+
+      - name: Create the AVD and its snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: echo "AVD snapshot created for the cache."
+
+      # Boots from the cached snapshot and never saves back to it, so every
+      # run starts from the same clean device.
       - name: Run Vibe with an emulator up
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -137,8 +163,9 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
+          force-avd-creation: false
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: repo
           script: bash ../bot/.github/vibe/agent.sh
 
