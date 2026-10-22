@@ -12,6 +12,7 @@ import android.os.VibratorManager
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
@@ -21,7 +22,6 @@ import com.tyvo.keyboard.audio.AudioRecorder
 import com.tyvo.keyboard.bubble.isBubbleEnabled
 import android.content.res.Configuration
 import androidx.core.view.WindowInsetsControllerCompat
-import com.tyvo.keyboard.data.ContextBehavior
 import com.tyvo.keyboard.data.InputContext
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.history.Maintenance
@@ -33,7 +33,6 @@ import com.tyvo.keyboard.settings.SettingsActivity
 import com.tyvo.keyboard.transcribe.Transcriber
 import com.tyvo.keyboard.ui.KeyboardColors
 import com.tyvo.keyboard.ui.KeyboardView
-import com.tyvo.keyboard.ui.PadKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -135,8 +134,6 @@ class TyvoInputMethodService : InputMethodService() {
         v.onNewline = { commitLiteral("\n") }
         v.onSpace = { commitLiteral(" ") }
         v.onEnableBubble = { openBubbleSetup() }
-        v.onPadKey = { commitLiteral(it) }
-        v.onEnter = { performEnter() }
         v.onCancel = { cancelVoiceMode() }
         view = v
         render(UiState.Idle())
@@ -196,7 +193,7 @@ class TyvoInputMethodService : InputMethodService() {
             if (voiceMode) switchAway() else render(reviewOrIdle(note = pending.note))
         } else if (pipeline?.isActive != true) {
             // Mid-transcription the status line is still telling the truth.
-            render(idleStateForMode())
+            render(stateForIdle())
         }
     }
 
@@ -204,43 +201,32 @@ class TyvoInputMethodService : InputMethodService() {
      * Adapts the keyboard to the field it is in front of.
      *
      * Returns true when the field is handed straight back to the previous
-     * keyboard (ContextBehavior.YIELD): there is nothing left to show or
-     * commit here.
+     * keyboard: numbers and passwords are typed, not spoken, and Tyvo has no
+     * keys of its own. The catch is that a keyboard that has switched away is
+     * no longer active, so the next text field opens on the previous keyboard
+     * too -- hence the toast, so the switch never looks like a glitch.
      */
     private fun applyContext(info: EditorInfo?): Boolean {
         voiceMode = isVoiceSubtype()
-        val v = view ?: return false
-        if (voiceMode) {
-            // Launched from another keyboard's mic key: dictate and return,
-            // whatever the field.
-            v.compact = true
-            v.pad = null
-            return false
+        view?.compact = voiceMode
+        // Launched from another keyboard's mic key: that keyboard already
+        // decided this field is for voice.
+        if (voiceMode) return false
+        val what = when (info?.let { InputContext.of(it.inputType, it.imeOptions) }) {
+            InputContext.NUMERIC -> "number"
+            InputContext.PASSWORD -> "password"
+            else -> return false
         }
-        v.compact = false
-        val context = info?.let { InputContext.of(it.inputType, it.imeOptions) }
-            ?: InputContext.TEXT
-        return when (InputContext.behaviorFor(
-            context,
-            numeric = settings.numericBehavior,
-            search = settings.searchBehavior,
-            password = settings.passwordBehavior,
-            uri = settings.uriBehavior,
-        )) {
-            ContextBehavior.VOICE -> {
-                v.pad = null
-                false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // False when there is no other keyboard to go to: Tyvo stays up.
+            if (!switchToPreviousInputMethod()) return false
+            runCatching {
+                Toast.makeText(this, "Tyvo: your keyboard for this $what field", Toast.LENGTH_SHORT).show()
             }
-            ContextBehavior.FALLBACK -> {
-                v.pad = if (context == InputContext.NUMERIC) PadKind.NUMERIC else PadKind.TEXT
-                false
-            }
-            ContextBehavior.YIELD -> {
-                v.pad = null
-                switchAway()
-                true
-            }
+        } else {
+            switchAway()
         }
+        return true
     }
 
     /** True when the active subtype is the voice one (mic-key handoff). */
@@ -253,17 +239,9 @@ class TyvoInputMethodService : InputMethodService() {
         super.onCurrentInputMethodSubtypeChanged(subtype)
         applyContext(currentInputEditorInfo)
         if (!session.isActive && pipeline?.isActive != true) {
-            render(idleStateForMode())
+            render(stateForIdle())
         }
     }
-
-    /**
-     * The idle state for the current UI mode. A fallback pad types without
-     * an API key, so an unconfigured keyboard still gets the pad rather
-     * than the setup prompt.
-     */
-    private fun idleStateForMode(): UiState =
-        if (view?.pad != null) UiState.Idle() else stateForIdle()
 
     /**
      * Re-checks setup whenever the keyboard comes back up.
@@ -282,7 +260,7 @@ class TyvoInputMethodService : InputMethodService() {
         // Only while idle: re-rendering mid-session would throw away a review
         // the user is still working with.
         if (!session.isActive && pipeline?.isActive != true) {
-            render(idleStateForMode())
+            render(stateForIdle())
         }
     }
 
@@ -531,14 +509,6 @@ class TyvoInputMethodService : InputMethodService() {
         session.clear()
         committed = ""
         render(UiState.Idle())
-    }
-
-    /**
-     * Enter on a fallback pad: the field's own action (Search, Go, Done…)
-     * rather than a raw newline, so the pad behaves like a real keyboard's.
-     */
-    private fun performEnter() {
-        if (!sendDefaultEditorAction(true)) commitLiteral("\n")
     }
 
     /**

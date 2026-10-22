@@ -186,20 +186,17 @@ from the bubble waits in History like any other.
 
 ## Fields where voice does not fit
 
-The keyboard looks at the field before deciding what to be. Number, phone
-and date/time fields get a number pad; search boxes, password fields and web
-addresses get compact text keys — a small QWERTY with one-shot shift and a
-digits/symbols layer. The pad's Enter sends the field's own action (Search,
-Go, Done), so a search box behaves as if its button was tapped, and the
-globe key switches to your usual keyboard for the rare character the pad
-does not have.
+The keyboard looks at the field before deciding what to be. Number, phone and
+date/time fields and password fields are typed, not spoken, so Tyvo hands them
+straight back to the previous keyboard with `switchToPreviousInputMethod()`
+and shows a toast saying so. It has no keys of its own to maintain. Web
+addresses and search boxes are classified too, but dictate as usual.
 
-For each of the four contexts — numeric, search, password, URI — Settings
-offers three choices: **Voice**, **Keys**, or **Switch away**, which hands the
-field straight back to the previous keyboard. Keys is the default everywhere:
-a keyboard that has handed the field away is no longer active and cannot
-switch itself back on the next field. Text fields always dictate; there is
-no setting for them.
+The cost: a keyboard that has switched away is no longer active and cannot
+switch itself back on the next field. After a password box, the next text
+field opens on your usual keyboard; its globe key or the floating mic gets you
+back to dictation. If Tyvo is the only keyboard enabled, there is nothing to
+switch to and the voice UI stays up. Text fields always dictate.
 
 ## The mic key
 
@@ -209,6 +206,10 @@ launch it from their mic key. In that mode the UI is compact: a mic and a
 cancel button, no review strip. When the dictation is committed or cancelled
 the keyboard returns to the one that launched it, via
 `switchToPreviousInputMethod()`.
+
+The subtype is `isAuxiliary="true"`, as Google Voice Typing's is: the system
+leaves it out of the keyboard-switch rotation, so Tyvo shows up once rather
+than once per subtype.
 
 ## Nothing is lost
 

@@ -2,7 +2,6 @@ package com.tyvo.keyboard
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
-import com.tyvo.keyboard.data.ContextBehavior
 import com.tyvo.keyboard.data.InputContext
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -11,14 +10,6 @@ class InputContextTest {
 
     private fun ctx(inputType: Int, imeOptions: Int = 0) =
         InputContext.of(inputType, imeOptions)
-
-    private fun behavior(
-        context: InputContext,
-        numeric: ContextBehavior = ContextBehavior.FALLBACK,
-        search: ContextBehavior = ContextBehavior.FALLBACK,
-        password: ContextBehavior = ContextBehavior.FALLBACK,
-        uri: ContextBehavior = ContextBehavior.FALLBACK,
-    ) = InputContext.behaviorFor(context, numeric, search, password, uri)
 
     @Test
     fun `plain text fields are text`() {
@@ -109,40 +100,6 @@ class InputContextTest {
         assertEquals(
             InputContext.TEXT,
             ctx(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
-        )
-    }
-
-    @Test
-    fun `text fields always dictate, whatever the other settings say`() {
-        assertEquals(
-            ContextBehavior.VOICE,
-            behavior(
-                InputContext.TEXT,
-                numeric = ContextBehavior.YIELD,
-                search = ContextBehavior.YIELD,
-                password = ContextBehavior.YIELD,
-                uri = ContextBehavior.YIELD,
-            )
-        )
-    }
-
-    @Test
-    fun `each context takes its own setting`() {
-        assertEquals(
-            ContextBehavior.YIELD,
-            behavior(InputContext.NUMERIC, numeric = ContextBehavior.YIELD)
-        )
-        assertEquals(
-            ContextBehavior.VOICE,
-            behavior(InputContext.SEARCH, search = ContextBehavior.VOICE)
-        )
-        assertEquals(
-            ContextBehavior.FALLBACK,
-            behavior(InputContext.PASSWORD, password = ContextBehavior.FALLBACK)
-        )
-        assertEquals(
-            ContextBehavior.YIELD,
-            behavior(InputContext.URI, uri = ContextBehavior.YIELD)
         )
     }
 }

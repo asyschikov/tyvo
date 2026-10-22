@@ -7,9 +7,11 @@
         android:imeSubtypeMode="keyboard"
         android:imeSubtypeLocale="en_US" />
     <!-- Launched from another keyboard's mic key: a compact dictate-and-return
-         UI, then back to the keyboard that launched us. -->
+         UI, then back to the keyboard that launched us. Auxiliary, so the
+         keyboard picker lists Tyvo once rather than once per subtype. -->
     <subtype
         android:name="@string/ime_name_voice"
         android:imeSubtypeMode="voice"
-        android:imeSubtypeLocale="en_US" />
+        android:imeSubtypeLocale="en_US"
+        android:isAuxiliary="true" />
 </input-method>

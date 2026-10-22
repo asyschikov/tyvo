@@ -17,7 +17,7 @@ a heavy day costs cents, a quiet week costs nothing.
 - **Dictation with clean-up** — raw text first, polished text swapped in
 - **Quick actions** — proofread, tone and length rewrites from the review strip
 - **Floating mic** — dictate into any field, with your usual keyboard
-- **Context-aware fields** — number pad for numeric fields; keys for search, passwords, addresses
+- **Context-aware fields** — number and password fields go to your usual keyboard
 - **Mic key mode** — keyboards with a mic key launch Tyvo; it dictates and returns
 - **History** — every dictation kept; failed ones retryable, with their audio
 - **Four providers** — Mistral, OpenAI, Gemini, xAI; one key each
@@ -49,17 +49,17 @@ showing.
 
 ### Context-aware fields
 
-Voice does not fit every field. Number, phone and date/time fields get a
-number pad; search boxes, password fields and web addresses get compact text
-keys. Each context is configurable — voice, keys, or handing the field back
-to your usual keyboard. The pad is the default: a keyboard that has handed
-the field away cannot switch itself back on the next one.
+Voice does not fit every field. Number, phone and date/time fields and
+password fields are handed straight back to your usual keyboard, with a toast
+saying so. Once it has switched away, Tyvo is no longer the active keyboard, so
+the next text field opens on your usual keyboard too: switch back with its
+globe key, or dictate there with the floating mic.
 
 ### Mic key mode
 
-Keyboards with a voice-key handoff can launch Tyvo from their mic key.
-Tyvo then shows a compact dictate-and-return UI: speak, the text lands, and
-the keyboard switches back to the one that launched it.
+Keyboards with a voice-key handoff (HeliBoard, FlorisBoard) can launch Tyvo
+from their mic key. Tyvo then shows a compact dictate-and-return UI: speak,
+the text lands, and the keyboard switches back to the one that launched it.
 
 ### History
 

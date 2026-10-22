@@ -8,7 +8,8 @@ import android.view.inputmethod.EditorInfo
  *
  * Voice does not fit every field: dictating into a number pad or a password
  * box is slower than typing. The IME classifies the field in
- * `onStartInputView` and adapts -- see [behaviorFor].
+ * `onStartInputView` and hands every non-[TEXT] field back to the previous
+ * keyboard, rather than growing keys of its own.
  */
 enum class InputContext {
     /** Ordinary prose. Voice is the whole point of the keyboard. */
@@ -57,41 +58,5 @@ enum class InputContext {
                 else -> TEXT
             }
         }
-
-        /**
-         * What the keyboard should do in [context], given the user's choice
-         * for each non-text context. Text fields always dictate: that is the
-         * product, and there is no setting for it.
-         */
-        fun behaviorFor(
-            context: InputContext,
-            numeric: ContextBehavior,
-            search: ContextBehavior,
-            password: ContextBehavior,
-            uri: ContextBehavior,
-        ): ContextBehavior = when (context) {
-            InputContext.TEXT -> ContextBehavior.VOICE
-            InputContext.NUMERIC -> numeric
-            InputContext.SEARCH -> search
-            InputContext.PASSWORD -> password
-            InputContext.URI -> uri
-        }
     }
-}
-
-/**
- * What the keyboard does in a field where voice does not fit.
- *
- * [FALLBACK] is the default everywhere: a yielded IME is no longer active
- * and cannot switch itself back on the next field, which strands the user.
- */
-enum class ContextBehavior(val label: String) {
-    /** Dictate as usual. */
-    VOICE("Voice"),
-
-    /** Show a built-in pad: a number pad for numeric fields, text keys otherwise. */
-    FALLBACK("Keys"),
-
-    /** Hand the field straight back to the previous keyboard. */
-    YIELD("Switch away"),
 }

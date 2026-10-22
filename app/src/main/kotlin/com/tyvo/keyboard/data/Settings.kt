@@ -307,32 +307,6 @@ class Settings(context: Context) {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
-    // ---- Input contexts --------------------------------------------------
-    //
-    // What the keyboard does in fields where voice does not fit, per
-    // context. FALLBACK by default: a yielded IME cannot switch itself back
-    // on the next field, which strands the user.
-
-    var numericBehavior: ContextBehavior
-        get() = behaviorPref(KEY_CTX_NUMERIC, ContextBehavior.FALLBACK)
-        set(v) = plain.edit().putString(KEY_CTX_NUMERIC, v.name).apply()
-
-    var searchBehavior: ContextBehavior
-        get() = behaviorPref(KEY_CTX_SEARCH, ContextBehavior.FALLBACK)
-        set(v) = plain.edit().putString(KEY_CTX_SEARCH, v.name).apply()
-
-    var passwordBehavior: ContextBehavior
-        get() = behaviorPref(KEY_CTX_PASSWORD, ContextBehavior.FALLBACK)
-        set(v) = plain.edit().putString(KEY_CTX_PASSWORD, v.name).apply()
-
-    var uriBehavior: ContextBehavior
-        get() = behaviorPref(KEY_CTX_URI, ContextBehavior.FALLBACK)
-        set(v) = plain.edit().putString(KEY_CTX_URI, v.name).apply()
-
-    private fun behaviorPref(key: String, default: ContextBehavior) = runCatching {
-        ContextBehavior.valueOf(plain.getString(key, null) ?: default.name)
-    }.getOrDefault(default)
-
     // ---- Floating mic ----------------------------------------------------
 
     /**
@@ -385,9 +359,5 @@ class Settings(context: Context) {
         const val KEY_BUBBLE_LEFT = "bubble_left"
         const val KEY_BUBBLE_SIZE = "bubble_size"
         const val KEY_BUBBLE_OPACITY = "bubble_opacity"
-        const val KEY_CTX_NUMERIC = "ctx_numeric"
-        const val KEY_CTX_SEARCH = "ctx_search"
-        const val KEY_CTX_PASSWORD = "ctx_password"
-        const val KEY_CTX_URI = "ctx_uri"
     }
 }

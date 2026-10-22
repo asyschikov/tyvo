@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tyvo.keyboard.data.BubbleOpacity
 import com.tyvo.keyboard.data.BubbleSize
-import com.tyvo.keyboard.data.ContextBehavior
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.data.Languages
 import com.tyvo.keyboard.data.ModelCatalog
@@ -217,10 +216,6 @@ private fun SettingsScreen(
     var toastOnFail by remember { mutableStateOf(settings.failureToasts) }
     var keepFailed by remember { mutableStateOf(settings.keepFailedAudio) }
     var discardSilence by remember { mutableStateOf(settings.discardShortSilence) }
-    var numericBehavior by remember { mutableStateOf(settings.numericBehavior) }
-    var searchBehavior by remember { mutableStateOf(settings.searchBehavior) }
-    var passwordBehavior by remember { mutableStateOf(settings.passwordBehavior) }
-    var uriBehavior by remember { mutableStateOf(settings.uriBehavior) }
     var corrections by remember { mutableStateOf(settings.corrections()) }
     var ownRules by remember { mutableStateOf(settings.cleanupRules) }
     // Re-read on each visit: the prompt screen is where this changes.
@@ -660,41 +655,6 @@ private fun SettingsScreen(
             )
         }
 
-        // ---- fields --------------------------------------------------------
-        // Where voice does not fit, what Tyvo does instead. Text fields are
-        // not listed: they always dictate.
-        SectionCard("Fields") {
-            Text(
-                "Voice does not fit every field. Pick what Tyvo does in each.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ContextPicker(
-                title = "Number fields",
-                subtitle = "Numbers, phone numbers, dates and times",
-                selected = numericBehavior,
-                onSelect = { numericBehavior = it; settings.numericBehavior = it },
-            )
-            ContextPicker(
-                title = "Search boxes",
-                subtitle = "Fields whose action is Search",
-                selected = searchBehavior,
-                onSelect = { searchBehavior = it; settings.searchBehavior = it },
-            )
-            ContextPicker(
-                title = "Passwords",
-                subtitle = "Voice stays out of password fields by default",
-                selected = passwordBehavior,
-                onSelect = { passwordBehavior = it; settings.passwordBehavior = it },
-            )
-            ContextPicker(
-                title = "Web addresses",
-                subtitle = "URI fields",
-                selected = uriBehavior,
-                onSelect = { uriBehavior = it; settings.uriBehavior = it },
-            )
-        }
-
         // Leaves room for the floating button to sit over dead space
         // rather than over the last setting.
         Spacer(Modifier.height(72.dp))
@@ -824,25 +784,6 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
     }
 }
 
-
-/** One field-context row: what it is, and the three-way choice for it. */
-@Composable
-private fun ContextPicker(
-    title: String,
-    subtitle: String,
-    selected: ContextBehavior,
-    onSelect: (ContextBehavior) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SegmentedPicker(ContextBehavior.entries, selected, { it.label }, onSelect)
-    }
-}
 
 @Composable
 private fun ToggleRow(
