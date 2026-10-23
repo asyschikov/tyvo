@@ -36,6 +36,11 @@ fun BubbleSetupDialog(ctx: Context, onDismiss: () -> Unit) {
             Text(
                 "Show the Tyvo bubble whenever you type, with any keyboard. " +
                     "Tap it to dictate, hold it to edit what you dictated.\n\n" +
+                    "The bubble runs as an accessibility service because that " +
+                    "is the only way to type into another app's field without " +
+                    "being its keyboard. The same access tells Tyvo which " +
+                    "field has focus, so the bubble appears at the right " +
+                    "moment.\n\n" +
                     "Tyvo never saves or sends the text already in your fields, " +
                     "and skips passwords.\n\n" +
                     "Next: turn on Tyvo bubble."
