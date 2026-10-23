@@ -18,6 +18,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -66,7 +67,15 @@ import com.tyvo.keyboard.ui.FeedbackButton
 import com.tyvo.keyboard.ui.SubScreenBar
 
 /** Which of the app's screens is showing. */
-private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE, PROMPT }
+private enum class Screen { WELCOME, HISTORY, SETTINGS, USAGE }
+
+/** Settings, split by what people come to change. */
+private enum class SettingsTab(val label: String) {
+    GENERAL("General"),
+    VOICE("Voice"),
+    CLEANUP("Clean-up"),
+    PROMPTS("Prompts"),
+}
 
 class SettingsActivity : ComponentActivity() {
 
@@ -130,6 +139,10 @@ class SettingsActivity : ComponentActivity() {
                         )
                     }
 
+                    // Held out here so leaving Settings and coming back
+                    // returns to the tab that was open.
+                    var settingsTab by remember { mutableStateOf(SettingsTab.GENERAL) }
+
                     when (screen) {
                         Screen.WELCOME -> WelcomeScreen(
                             settings = settings,
@@ -150,13 +163,9 @@ class SettingsActivity : ComponentActivity() {
                         Screen.SETTINGS -> SettingsScreen(
                             settings = settings,
                             activity = activity,
+                            tab = settingsTab,
+                            onTab = { settingsTab = it },
                             onBack = { screen = Screen.HISTORY },
-                            onEditPrompt = { screen = Screen.PROMPT },
-                        )
-
-                        Screen.PROMPT -> CleanupPromptScreen(
-                            settings = settings,
-                            onBack = { screen = Screen.SETTINGS },
                         )
 
                         Screen.USAGE -> {
@@ -175,9 +184,8 @@ class SettingsActivity : ComponentActivity() {
                     }
 
                     BackHandler(
-                        enabled = screen == Screen.SETTINGS || screen == Screen.USAGE ||
-                            screen == Screen.PROMPT
-                    ) { screen = if (screen == Screen.PROMPT) Screen.SETTINGS else Screen.HISTORY }
+                        enabled = screen == Screen.SETTINGS || screen == Screen.USAGE
+                    ) { screen = Screen.HISTORY }
 
                     // One button for the whole app rather than one per
                     // screen: the moment someone has something to say is
@@ -195,8 +203,9 @@ class SettingsActivity : ComponentActivity() {
 private fun SettingsScreen(
     settings: Settings,
     activity: ComponentActivity,
+    tab: SettingsTab,
+    onTab: (SettingsTab) -> Unit,
     onBack: () -> Unit,
-    onEditPrompt: () -> Unit,
 ) {
     val ctx = activity as Context
 
@@ -219,8 +228,8 @@ private fun SettingsScreen(
     var discardSilence by remember { mutableStateOf(settings.discardShortSilence) }
     var corrections by remember { mutableStateOf(settings.corrections()) }
     var ownRules by remember { mutableStateOf(settings.cleanupRules) }
-    // Re-read on each visit: the prompt screen is where this changes.
-    val promptOverridden = remember { settings.cleanupPrompt.isNotBlank() }
+    // Set again by the editor in the Prompts tab.
+    var promptOverridden by remember { mutableStateOf(settings.cleanupPrompt.isNotBlank()) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var explainingBubble by remember { mutableStateOf(false) }
@@ -254,14 +263,34 @@ private fun SettingsScreen(
         ActivityResultContracts.RequestPermission()
     ) { notifyGranted = it }
 
-    Scaffold(topBar = { SubScreenBar("Settings", onBack) }) { padding ->
+    // Fresh per tab: each tab opens at its top, not at the last one's offset.
+    val scroll = remember(tab) { ScrollState(0) }
+
+    Scaffold(
+        topBar = {
+            Column {
+                SubScreenBar("Settings", onBack)
+                // Scrollable rather than fixed: four equal slots wrap
+                // "Clean-up" over two lines at larger font sizes.
+                PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
+                    SettingsTab.entries.forEach { t ->
+                        Tab(
+                            selected = t == tab,
+                            onClick = { onTab(t) },
+                            text = { Text(t.label, maxLines = 1, softWrap = false) },
+                        )
+                    }
+                }
+            }
+        },
+    ) { padding ->
     Column(
         Modifier
             .fillMaxSize()
             .padding(padding)
             .consumeWindowInsets(padding)
             .imePadding()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -282,393 +311,412 @@ private fun SettingsScreen(
             }
         }
 
-        // ---- setup ------------------------------------------------------
-        SectionCard("Setup") {
-            SetupRow(
-                done = micGranted,
-                label = "Microphone access",
-                button = "Grant",
-                onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-            )
-            if (android.os.Build.VERSION.SDK_INT >= 33 && notifyOnFail) {
-                SetupRow(
-                    done = notifyGranted,
-                    label = "Alerts for failed dictations",
-                    button = "Allow",
-                    onClick = {
-                        notifyLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    },
-                )
-            }
-            SetupRow(
-                done = isImeEnabled(ctx),
-                label = "Enable Tyvo in system settings",
-                button = "Open",
-                onClick = {
-                    ctx.startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
-                },
-            )
-            SetupRow(
-                done = isBubbleEnabled(ctx),
-                label = "Enable bubble",
-                button = "Set up",
-                onClick = { explainingBubble = true },
-            )
-            SetupRow(
-                done = false,
-                showCheck = false,
-                label = "Switch to Tyvo",
-                button = "Picker",
-                onClick = {
-                    (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                        .showInputMethodPicker()
-                },
-            )
-        }
-
-        if (explainingBubble) {
-            BubbleSetupDialog(ctx) { explainingBubble = false }
-        }
-
-        // ---- bubble -------------------------------------------------------
-        // The preview floats over the card's top corner, beside the title, the
-        // way the bubble floats at the screen edge -- no row of its own.
-        Box {
-        SectionCard("Bubble") {
-            Text("Size", style = MaterialTheme.typography.bodyMedium)
-            SegmentedPicker(BubbleSize.entries, bubbleSize, { it.label }) {
-                bubbleSize = it
-                settings.bubbleSize = it
-            }
-            Text("Opacity when idle", style = MaterialTheme.typography.bodyMedium)
-            SegmentedPicker(BubbleOpacity.entries, bubbleOpacity, { it.label }) {
-                bubbleOpacity = it
-                settings.bubbleOpacity = it
-            }
-        }
-        BubblePreview(bubbleSize, bubbleOpacity, Modifier.align(Alignment.TopEnd))
-        }
-
-        // ---- provider, and everything belonging to it ----------------------
-        // One card rather than two: split across cards, the radio buttons and
-        // the key field they configure ended up about 60dp and a heading
-        // apart, which read as unrelated settings.
-        SectionCard("AI provider") {
-            Text(
-                "One key covers both transcription and clean-up.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ChoiceRow(
-                options = Provider.entries.map { it to it.label },
-                selected = provider,
-                onSelect = {
-                    provider = it
-                    settings.provider = it
-                    testResult = null
-                },
-            )
-
-            if (!provider.verified) {
-                Text(
-                    "Untested against the live API. OpenAI and Mistral are known " +
-                        "to work.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it; settings.setKey(provider, it) },
-                label = { Text("${provider.label} API key") },
-                singleLine = true,
-                visualTransformation =
-                    if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                textStyle = MaterialTheme.typography.bodyMedium
-                    .copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = showKey, onCheckedChange = { showKey = it })
-                Text("Show key", style = MaterialTheme.typography.bodyMedium)
-            }
-            Text(
-                "Stored encrypted, sent only to ${provider.label}. Keys for " +
-                    "other providers are kept.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Button(
-                    enabled = !testing && apiKey.isNotBlank(),
-                    onClick = {
-                        testing = true
-                        testResult = null
-                        scope.launch {
-                            val r = ConnectionTest.test(settings, provider)
-                            testResult = when (r) {
-                                is ConnectionTest.Result.Ok -> r.detail
-                                is ConnectionTest.Result.Failed -> r.reason
-                            }
-                            testing = false
-                        }
-                    },
-                ) { Text(if (testing) "Testing…" else "Test connection") }
-                Spacer(Modifier.width(12.dp))
-                testResult?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            HorizontalDivider()
-
-            Text(
-                "Transcription — turns your voice into text.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ModelPicker(
-                options = ModelCatalog.transcribeFor(provider),
-                selected = tModel,
-                default = Transcriber.defaultModelFor(provider),
-                onSelect = { tModel = it; settings.setTranscribeModel(provider, it) },
-            )
-
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Clean-up — turns what you said into what you meant to write.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Switch(
-                    checked = polishOn,
-                    onCheckedChange = { polishOn = it; settings.polishEnabled = it },
-                )
-                Spacer(Modifier.width(10.dp))
-                Text("Clean up dictation", style = MaterialTheme.typography.bodyMedium)
-            }
-            if (polishOn) {
-                ModelPicker(
-                    options = ModelCatalog.polishFor(provider),
-                    selected = pModel,
-                    default = Polisher.defaultModelFor(provider),
-                    onSelect = { pModel = it; settings.setPolishModel(provider, it) },
-                )
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Corrections",
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
+        when (tab) {
+            SettingsTab.GENERAL -> {
+                // ---- setup ------------------------------------------------------
+                SectionCard("Setup") {
+                    SetupRow(
+                        done = micGranted,
+                        label = "Microphone access",
+                        button = "Grant",
+                        onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                     )
-                    val allOn = corrections.size == Correction.entries.size
-                    TextButton(enabled = !promptOverridden, onClick = {
-                        val next = if (allOn) emptySet() else Correction.entries.toSet()
-                        corrections = next
-                        settings.enabledCorrections = next.map { it.id }.toSet()
-                    }) { Text(if (allOn) "None" else "All") }
+                    if (android.os.Build.VERSION.SDK_INT >= 33 && notifyOnFail) {
+                        SetupRow(
+                            done = notifyGranted,
+                            label = "Alerts for failed dictations",
+                            button = "Allow",
+                            onClick = {
+                                notifyLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            },
+                        )
+                    }
+                    SetupRow(
+                        done = isImeEnabled(ctx),
+                        label = "Enable Tyvo in system settings",
+                        button = "Open",
+                        onClick = {
+                            ctx.startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
+                        },
+                    )
+                    SetupRow(
+                        done = isBubbleEnabled(ctx),
+                        label = "Enable bubble",
+                        button = "Set up",
+                        onClick = { explainingBubble = true },
+                    )
+                    SetupRow(
+                        done = false,
+                        showCheck = false,
+                        label = "Switch to Tyvo",
+                        button = "Picker",
+                        onClick = {
+                            (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                                .showInputMethodPicker()
+                        },
+                    )
                 }
-                Correction.entries.forEach { c ->
-                    val on = c in corrections
+
+                if (explainingBubble) {
+                    BubbleSetupDialog(ctx) { explainingBubble = false }
+                }
+
+                // ---- bubble -------------------------------------------------------
+                // The preview floats over the card's top corner, beside the title, the
+                // way the bubble floats at the screen edge -- no row of its own.
+                Box {
+                SectionCard("Bubble") {
+                    Text("Size", style = MaterialTheme.typography.bodyMedium)
+                    SegmentedPicker(BubbleSize.entries, bubbleSize, { it.label }) {
+                        bubbleSize = it
+                        settings.bubbleSize = it
+                    }
+                    Text("Opacity when idle", style = MaterialTheme.typography.bodyMedium)
+                    SegmentedPicker(BubbleOpacity.entries, bubbleOpacity, { it.label }) {
+                        bubbleOpacity = it
+                        settings.bubbleOpacity = it
+                    }
+                }
+                BubblePreview(bubbleSize, bubbleOpacity, Modifier.align(Alignment.TopEnd))
+                }
+
+                // ---- recordings ----------------------------------------------------
+                SectionCard("Recordings") {
+                    ToggleRow(
+                        checked = discardSilence,
+                        onChange = { discardSilence = it; settings.discardShortSilence = it },
+                        title = "Drop short silent clips",
+                        subtitle = "Under 3 seconds with no words heard: not saved, no message. " +
+                            "Off: kept in Tyvo as \"Nothing heard\".",
+                    )
+                }
+
+                // The version, muted, at the very bottom: a screenshot of the
+                // settings screen says which build it came from.
+                Text(
+                    "Tyvo ${BuildConfig.VERSION_NAME}",
+                    Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                // Leaves room for the floating button to sit over dead space
+                // rather than over the last setting.
+                Spacer(Modifier.height(72.dp))
+            }
+
+            SettingsTab.VOICE -> {
+                // ---- provider, and everything belonging to it ----------------------
+                // One card rather than two: split across cards, the radio buttons and
+                // the key field they configure ended up about 60dp and a heading
+                // apart, which read as unrelated settings.
+                SectionCard("AI provider") {
+                    Text(
+                        "One key covers both transcription and clean-up.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ChoiceRow(
+                        options = Provider.entries.map { it to it.label },
+                        selected = provider,
+                        onSelect = {
+                            provider = it
+                            settings.provider = it
+                            testResult = null
+                        },
+                    )
+
+                    if (!provider.verified) {
+                        Text(
+                            "Untested against the live API. OpenAI and Mistral are known " +
+                                "to work.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it; settings.setKey(provider, it) },
+                        label = { Text("${provider.label} API key") },
+                        singleLine = true,
+                        visualTransformation =
+                            if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                            .copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = showKey, onCheckedChange = { showKey = it })
+                        Text("Show key", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(
+                        "Stored encrypted, sent only to ${provider.label}. Keys for " +
+                            "other providers are kept.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Button(
+                            enabled = !testing && apiKey.isNotBlank(),
+                            onClick = {
+                                testing = true
+                                testResult = null
+                                scope.launch {
+                                    val r = ConnectionTest.test(settings, provider)
+                                    testResult = when (r) {
+                                        is ConnectionTest.Result.Ok -> r.detail
+                                        is ConnectionTest.Result.Failed -> r.reason
+                                    }
+                                    testing = false
+                                }
+                            },
+                        ) { Text(if (testing) "Testing…" else "Test connection") }
+                        Spacer(Modifier.width(12.dp))
+                        testResult?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    Text(
+                        "Transcription — turns your voice into text.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ModelPicker(
+                        options = ModelCatalog.transcribeFor(provider),
+                        selected = tModel,
+                        default = Transcriber.defaultModelFor(provider),
+                        onSelect = { tModel = it; settings.setTranscribeModel(provider, it) },
+                    )
+                }
+
+                // ---- language ------------------------------------------------------
+                SectionCard("Language") {
+                    val chosen = Languages.byCode(lang)
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Checkbox(
-                            checked = on,
-                            enabled = !promptOverridden,
-                            onCheckedChange = { checked ->
-                                settings.setCorrection(c, checked)
-                                corrections = settings.corrections()
-                            },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Column {
-                            Text(c.label, style = MaterialTheme.typography.bodyMedium)
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                c.summary,
+                                chosen?.name ?: "Detect automatically",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                chosen?.native?.takeIf { it != chosen.name }
+                                    ?: "The provider works out what you are speaking.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        if (chosen != null) {
+                            TextButton(onClick = { lang = ""; settings.languageHint = "" }) {
+                                Text("Clear")
+                            }
+                        }
+                        TextButton(onClick = { pickingLanguage = true }) {
+                            Text(if (chosen == null) "Choose" else "Change")
+                        }
                     }
-                }
-                // Measured, not guessed: on a small model, seven corrections
-                // drops the spoken-correction hit rate from 3/3 to 1/3.
-                val heavy = corrections.count { !it.defaultOn } > 0 &&
-                    corrections.size > Correction.defaults.size
-                if (heavy) {
+
                     Text(
-                        "Extras can crowd out the others on the smallest " +
-                            "models: spoken corrections may stop being applied.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (corrections.isEmpty()) {
-                    Text(
-                        "Nothing selected: the transcript is returned as spoken.",
+                        "Only worth setting if you dictate in one language. OpenAI " +
+                            "honours it; Mistral detects the language itself and appears " +
+                            "to ignore it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-                OutlinedTextField(
-                    value = ownRules,
-                    onValueChange = { ownRules = it; settings.cleanupRules = it },
-                    enabled = !promptOverridden,
-                    label = { Text("Your rules") },
-                    placeholder = { Text("Anything else clean-up should know, one per line") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
-                Text(
-                    "Added after the corrections above, and they win if the two disagree.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Full prompt", style = MaterialTheme.typography.bodyMedium)
+                    if (lang.isBlank()) {
                         Text(
-                            if (promptOverridden) "Your own prompt is in use; corrections and rules are off."
-                            else "See or rewrite everything clean-up is told.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (promptOverridden) ModifiedBadge("Modified")
-                    TextButton(onClick = onEditPrompt) { Text("Edit") }
-                }
-                TryBox(settings) { cleanUp(it) }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Switch(
-                        checked = autoPolish,
-                        onCheckedChange = { autoPolish = it; settings.autoPolish = it },
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            "Clean up automatically",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            "Off: insert the raw transcript; clean up on demand.",
+                            "Detection handled every case tested, down to single words.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-            }
-        }
 
-        SectionCard("Quick actions") {
-            QuickActionsEditor(settings)
-        }
-
-        // ---- accuracy -----------------------------------------------------
-        // ---- language ------------------------------------------------------
-        SectionCard("Language") {
-            val chosen = Languages.byCode(lang)
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        chosen?.name ?: "Detect automatically",
-                        style = MaterialTheme.typography.bodyMedium,
+                // ---- vocabulary ----------------------------------------------------
+                SectionCard("Vocabulary") {
+                    OutlinedTextField(
+                        value = vocab,
+                        onValueChange = { vocab = it; settings.vocabulary = it },
+                        label = { Text("Words to expect") },
+                        placeholder = { Text("Names and jargon, comma separated") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
                     )
                     Text(
-                        chosen?.native?.takeIf { it != chosen.name }
-                            ?: "The provider works out what you are speaking.",
+                        "Names and jargon it keeps mishearing. A nudge, not a rule.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (chosen != null) {
-                    TextButton(onClick = { lang = ""; settings.languageHint = "" }) {
-                        Text("Clear")
+            }
+
+            SettingsTab.CLEANUP -> {
+                SectionCard("Clean-up") {
+                    Text(
+                        "Clean-up — turns what you said into what you meant to write.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Switch(
+                            checked = polishOn,
+                            onCheckedChange = { polishOn = it; settings.polishEnabled = it },
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text("Clean up dictation", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (polishOn) {
+                        ModelPicker(
+                            options = ModelCatalog.polishFor(provider),
+                            selected = pModel,
+                            default = Polisher.defaultModelFor(provider),
+                            onSelect = { pModel = it; settings.setPolishModel(provider, it) },
+                        )
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Corrections",
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                            val allOn = corrections.size == Correction.entries.size
+                            TextButton(enabled = !promptOverridden, onClick = {
+                                val next = if (allOn) emptySet() else Correction.entries.toSet()
+                                corrections = next
+                                settings.enabledCorrections = next.map { it.id }.toSet()
+                            }) { Text(if (allOn) "None" else "All") }
+                        }
+                        Correction.entries.forEach { c ->
+                            val on = c in corrections
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = on,
+                                    enabled = !promptOverridden,
+                                    onCheckedChange = { checked ->
+                                        settings.setCorrection(c, checked)
+                                        corrections = settings.corrections()
+                                    },
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Column {
+                                    Text(c.label, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        c.summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        // Measured, not guessed: on a small model, seven corrections
+                        // drops the spoken-correction hit rate from 3/3 to 1/3.
+                        val heavy = corrections.count { !it.defaultOn } > 0 &&
+                            corrections.size > Correction.defaults.size
+                        if (heavy) {
+                            Text(
+                                "Extras can crowd out the others on the smallest " +
+                                    "models: spoken corrections may stop being applied.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        if (corrections.isEmpty()) {
+                            Text(
+                                "Nothing selected: the transcript is returned as spoken.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = ownRules,
+                            onValueChange = { ownRules = it; settings.cleanupRules = it },
+                            enabled = !promptOverridden,
+                            label = { Text("Your rules") },
+                            placeholder = { Text("Anything else clean-up should know, one per line") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                        )
+                        Text(
+                            "Added after the corrections above, and they win if the two disagree.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Full prompt", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    if (promptOverridden) "Your own prompt is in use; corrections and rules are off."
+                                    else "See or rewrite everything clean-up is told.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (promptOverridden) ModifiedBadge("Modified")
+                            TextButton(onClick = { onTab(SettingsTab.PROMPTS) }) { Text("Edit") }
+                        }
+                        TryBox(settings) { cleanUp(it) }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Switch(
+                                checked = autoPolish,
+                                onCheckedChange = { autoPolish = it; settings.autoPolish = it },
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    "Clean up automatically",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    "Off: insert the raw transcript; clean up on demand.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
-                TextButton(onClick = { pickingLanguage = true }) {
-                    Text(if (chosen == null) "Choose" else "Change")
+            }
+
+            SettingsTab.PROMPTS -> {
+                SectionCard("Clean-up prompt") {
+                    CleanupPromptEditor(settings) { promptOverridden = it }
+                }
+
+                SectionCard("Quick actions") {
+                    QuickActionsEditor(settings)
                 }
             }
-
-            Text(
-                "Only worth setting if you dictate in one language. OpenAI " +
-                    "honours it; Mistral detects the language itself and appears " +
-                    "to ignore it.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (lang.isBlank()) {
-                Text(
-                    "Detection handled every case tested, down to single words.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
-
-        // ---- vocabulary ----------------------------------------------------
-        SectionCard("Vocabulary") {
-            OutlinedTextField(
-                value = vocab,
-                onValueChange = { vocab = it; settings.vocabulary = it },
-                label = { Text("Words to expect") },
-                placeholder = { Text("Names and jargon, comma separated") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-            )
-            Text(
-                "Names and jargon it keeps mishearing. A nudge, not a rule.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        // ---- recordings ----------------------------------------------------
-        SectionCard("Recordings") {
-            ToggleRow(
-                checked = discardSilence,
-                onChange = { discardSilence = it; settings.discardShortSilence = it },
-                title = "Drop short silent clips",
-                subtitle = "Under 3 seconds with no words heard: not saved, no message. " +
-                    "Off: kept in Tyvo as \"Nothing heard\".",
-            )
-        }
-
-        // The version, muted, at the very bottom: a screenshot of the
-        // settings screen says which build it came from.
-        Text(
-            "Tyvo ${BuildConfig.VERSION_NAME}",
-            Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         // Leaves room for the floating button to sit over dead space
         // rather than over the last setting.
-        Spacer(Modifier.height(72.dp))
+        if (tab != SettingsTab.GENERAL) Spacer(Modifier.height(72.dp))
     }
 
     }

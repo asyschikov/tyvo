@@ -16,7 +16,6 @@ import com.tyvo.keyboard.actions.QuickAction
 import com.tyvo.keyboard.actions.QuickActions
 import com.tyvo.keyboard.data.Settings
 import com.tyvo.keyboard.polish.Polisher
-import com.tyvo.keyboard.ui.SubScreenBar
 import com.tyvo.keyboard.usage.UsageStore
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -82,9 +81,10 @@ internal fun TryBox(
 /**
  * The whole clean-up prompt, editable. Opens on exactly what is sent today,
  * so an edit starts from the working prompt rather than a blank box.
+ * [onChanged] says whether the user's own prompt is now in use.
  */
 @Composable
-internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
+internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boolean) -> Unit) {
     var saved by remember { mutableStateOf(settings.cleanupPrompt) }
     var text by remember { mutableStateOf(settings.cleanupSystemPrompt()) }
     var defaultChanged by remember { mutableStateOf(settings.cleanupDefaultChanged) }
@@ -97,32 +97,23 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
         saved = ""
         text = built
         defaultChanged = false
+        onChanged(false)
     }
 
-    Scaffold(
-        topBar = {
-            SubScreenBar("Clean-up prompt", onBack) {
-                if (modified) ModifiedBadge("Modified")
-                Spacer(Modifier.width(12.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "The full instruction sent with every dictation. While you use your " +
+                    "own, the corrections and your rules in the Clean-up tab are not applied.",
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (modified) {
+                Spacer(Modifier.width(8.dp))
+                ModifiedBadge("Modified")
             }
-        },
-    ) { padding ->
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .consumeWindowInsets(padding)
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            "The full instruction sent with every dictation. While you use your " +
-                "own, the Corrections and Your rules settings are not applied.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        }
 
         if (defaultChanged) {
             Card(
@@ -167,6 +158,7 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
                     settings.saveCleanupPrompt(text)
                     saved = settings.cleanupPrompt
                     defaultChanged = settings.cleanupDefaultChanged
+                    onChanged(saved.isNotBlank())
                 },
             ) { Text("Save") }
             OutlinedButton(
@@ -182,9 +174,6 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TryBox(settings) { cleanUp(it, system = text) }
-
-        Spacer(Modifier.height(72.dp))
-    }
     }
 }
 
@@ -193,12 +182,14 @@ internal fun CleanupPromptScreen(settings: Settings, onBack: () -> Unit) {
 internal fun QuickActionsEditor(settings: Settings) {
     var actions by remember { mutableStateOf(settings.quickActions()) }
     var edits by remember { mutableStateOf(settings.actionEdits) }
+    var removed by remember { mutableStateOf(settings.removedActions) }
     // Null: closed. A blank id: a new action being made.
     var editing by remember { mutableStateOf<QuickAction?>(null) }
 
     fun refresh() {
         actions = settings.quickActions()
         edits = settings.actionEdits
+        removed = settings.removedActions
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -232,6 +223,31 @@ internal fun QuickActionsEditor(settings: Settings) {
             }
         }
         TextButton(onClick = { editing = QuickActions.custom("", "", "") }) { Text("+ New action") }
+
+        // Removed built-ins stay listed, so taking one off the bar is never
+        // a decision that cannot be undone from here.
+        val gone = QuickActions.ALL.filter { it.id in removed }
+        if (gone.isNotEmpty()) {
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            Text("Removed", style = MaterialTheme.typography.labelLarge)
+            gone.forEach { a ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        a.label,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = {
+                        settings.removedActions = settings.removedActions - a.id
+                        refresh()
+                    }) { Text("Restore") }
+                }
+            }
+        }
     }
 
     editing?.let { a ->
@@ -329,6 +345,13 @@ private fun ActionEditorDialog(
                         settings.customActions = settings.customActions.filter { it.id != action.id }
                         onChanged()
                     }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }
+                // A built-in is only hidden: it can be restored from the list.
+                if (!isCustom && builtIn != null) {
+                    TextButton(onClick = {
+                        settings.removedActions = settings.removedActions + action.id
+                        onChanged()
+                    }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }

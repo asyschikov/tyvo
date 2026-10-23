@@ -67,4 +67,10 @@ class CustomPromptTest {
         val merged = QuickActions.merged(emptyMap(), listOf(QuickActions.custom("custom_2", "Empty", "")))
         assertEquals(QuickActions.ALL.size, merged.size)
     }
+
+    @Test
+    fun `removed built-ins drop out and keep the rest in order`() {
+        val merged = QuickActions.merged(emptyMap(), emptyList(), removed = setOf("formal"))
+        assertEquals(QuickActions.ALL.map { it.id } - "formal", merged.map { it.id })
+    }
 }

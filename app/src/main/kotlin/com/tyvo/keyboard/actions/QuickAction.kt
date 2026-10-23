@@ -182,8 +182,12 @@ object QuickActions {
      * actions in the order they made them. A blank edit counts as none, so
      * clearing the field brings the built-in instruction back.
      */
-    fun merged(edits: Map<String, String>, custom: List<QuickAction>): List<QuickAction> =
-        ALL.map { a ->
+    fun merged(
+        edits: Map<String, String>,
+        custom: List<QuickAction>,
+        removed: Set<String> = emptySet(),
+    ): List<QuickAction> =
+        ALL.filter { it.id !in removed }.map { a ->
             edits[a.id]?.trim()?.takeIf { it.isNotEmpty() }?.let { a.copy(instruction = it) } ?: a
         } + custom.filter { it.label.isNotBlank() && it.instruction.isNotBlank() }
 

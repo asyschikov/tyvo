@@ -281,7 +281,16 @@ class Settings(context: Context) {
         ).apply()
 
     /** The action bar: built-ins as the user edited them, then their own. */
-    fun quickActions(): List<QuickAction> = QuickActions.merged(actionEdits, customActions)
+    /**
+     * Built-in actions the user removed, by id. Kept as a set rather than by
+     * deleting anything, so a removed one can be put back as it was.
+     */
+    var removedActions: Set<String>
+        get() = plain.getStringSet(KEY_REMOVED_ACTIONS, null)?.toSet() ?: emptySet()
+        set(v) = plain.edit().putStringSet(KEY_REMOVED_ACTIONS, v).apply()
+
+    fun quickActions(): List<QuickAction> =
+        QuickActions.merged(actionEdits, customActions, removedActions)
 
     /**
      * The language sent to the transcriber, or blank to let it detect.
@@ -352,6 +361,7 @@ class Settings(context: Context) {
         const val KEY_CLEANUP_BASE = "cleanup_prompt_base"
         const val KEY_ACTION_EDITS = "action_edits"
         const val KEY_CUSTOM_ACTIONS = "custom_actions"
+        const val KEY_REMOVED_ACTIONS = "removed_actions"
         const val KEY_ONBOARDED = "has_onboarded"
         const val KEY_LANG = "language_hint"
         const val KEY_VOCAB = "vocabulary"
