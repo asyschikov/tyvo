@@ -78,10 +78,10 @@ Tools
 
 ## Privacy policy URL
 
-Needs a public URL. Options:
+<https://asyschikov.github.io/tyvo/privacy>
 
-- GitHub raw: `https://github.com/asyschikov/tyvo/blob/main/PRIVACY.md`
-- GitHub Pages, if you want something tidier
+GitHub Pages serves `docs/` on `main`. The policy lives only in
+`docs/privacy.md`, so the published page and the repository cannot drift.
 
 ## Data safety answers
 

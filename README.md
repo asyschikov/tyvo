@@ -91,7 +91,7 @@ to the transcriber as a biasing hint.
 
 No account, no analytics, no crash reporting. Recordings and transcripts
 stay on the device, and nothing passes through infrastructure belonging to
-this project, because there isn't any. See [PRIVACY.md](PRIVACY.md).
+this project, because there isn't any. See [the privacy policy](docs/privacy.md).
 
 ## Get started
 

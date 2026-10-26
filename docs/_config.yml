@@ -1,0 +1,6 @@
+# GitHub Pages serves this directory so the privacy policy has a stable public
+# URL, which Play Console requires. The content of privacy.md is a copy of
+# PRIVACY.md in the repository root; keep the two in step.
+title: Tyvo
+description: An Android keyboard that dictates, cleans up what you said, and lets you reshape it.
+theme: jekyll-theme-primer

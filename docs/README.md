@@ -425,7 +425,7 @@ mic and talked.
 ## Privacy
 
 There is no server, so there is very little to say: see
-[PRIVACY.md](../PRIVACY.md), which includes the commands to check its claims
+[the privacy policy](privacy.md), which includes the commands to check its claims
 against the source.
 
 ## Licence
