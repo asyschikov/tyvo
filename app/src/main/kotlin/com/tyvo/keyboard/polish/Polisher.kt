@@ -136,7 +136,7 @@ class Polisher(
             ?.optJSONObject("message")
             ?.optString("content")
             .orEmpty()
-        return stripLabel(stripDashes(text.trim()), original).ifBlank { original }
+        return stripDashes(text.trim()).ifBlank { original }
     }
 
     /**
@@ -179,8 +179,7 @@ class Polisher(
 
         val json = Http.json(req, "Polish")
         usage?.record(Transcriber.geminiUsage(json, model, UsageEvent.Kind.POLISH))
-        return stripLabel(stripDashes(Transcriber.geminiText(json)), original)
-            .ifBlank { original }
+        return stripDashes(Transcriber.geminiText(json)).ifBlank { original }
     }
 
     companion object {
@@ -202,41 +201,6 @@ class Polisher(
             .replace("–", ", ")
             .replace(Regex(",\\s*,"), ",")
             .replace(Regex("\\s+,"), ",")
-
-        /**
-         * Removes a leading label the model put on its output: "message",
-         * and "note", which the prompts say where they once said "message".
-         *
-         * The prompts no longer offer "message", but a small chat model
-         * labels its output with a noun anyway, and those were the two it
-         * reached for: every dictation came back as "message I love tyvo",
-         * a word the speaker never said. Only a leading label is removed,
-         * and only when the transcript does not contain the word -- clean-up
-         * never adds words, so a label the speaker did not say was put there
-         * by the model. A dictation that really starts "note to self..."
-         * keeps its first word, because a keyboard that quietly rewrites
-         * your voice is worse than one that leaves a stray label in.
-         */
-        fun stripLabel(text: String, spoken: String): String {
-            var out = text
-            LABELS.forEach { (leading, spokenWord) ->
-                if (leading.containsMatchIn(out) && !spokenWord.containsMatchIn(spoken)) {
-                    out = leading.replaceFirst(out, "")
-                }
-            }
-            return out
-        }
-
-        /**
-         * The labels a small model puts on its output, each with the guard
-         * that keeps the speaker's own word: a leading "message" or "note"
-         * wearing the punctuation a label carries, and the same word
-         * anywhere in what the speaker said.
-         */
-        private val LABELS = listOf(
-            Regex("(?i)^message\\b[\\s:,.!?;–—-]*") to Regex("(?i)\\bmessage\\b"),
-            Regex("(?i)^note\\b[\\s:,.!?;–—-]*") to Regex("(?i)\\bnote\\b"),
-        )
 
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
