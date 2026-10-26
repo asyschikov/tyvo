@@ -48,6 +48,12 @@ android {
         }
         debug {
             applicationIdSuffix = ""
+            // The release key too, when the environment carries it, so a
+            // local debug install, a bot preview and a GitHub release all
+            // update one another. Without it, Gradle's own debug key.
+            if (System.getenv("TYVO_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

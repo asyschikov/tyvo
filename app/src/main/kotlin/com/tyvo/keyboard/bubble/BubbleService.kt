@@ -125,6 +125,11 @@ class BubbleService : AccessibilityService() {
         // Focus and window events arrive in bursts; settle before looking.
         handler.removeCallbacks(refresher)
         handler.postDelayed(refresher, REFRESH_DELAY_MS)
+        // Some apps focus the field first and bring the keyboard up a moment
+        // later, and nothing tells us once it is there (Claude does this), so
+        // the look above finds no keyboard. Look again once it has had time.
+        handler.removeCallbacks(settler)
+        SETTLE_DELAYS_MS.forEach { handler.postDelayed(settler, it) }
     }
 
     override fun onInterrupt() = Unit
@@ -142,6 +147,7 @@ class BubbleService : AccessibilityService() {
     // ---- Visibility ------------------------------------------------------
 
     private val refresher = Runnable { refresh() }
+    private val settler = Runnable { refresh() }
 
     private fun refresh() {
         if (!::settings.isInitialized) return
@@ -169,10 +175,25 @@ class BubbleService : AccessibilityService() {
     private fun isBusy(): Boolean =
         recorder.isRecording || pipeline?.isActive == true || panel != null
 
-    private fun focusedField(): AccessibilityNodeInfo? =
-        findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf {
-            it.isEditable && !it.isPassword && it.packageName != packageName
+    private fun focusedField(): AccessibilityNodeInfo? {
+        val focus = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
+        // Compose apps (Claude among them) report input focus on the one
+        // view they draw everything in, not on the field inside it.
+        val field = if (focus.isEditable) focus else focusedEditableIn(focus)
+        return field?.takeIf { !it.isPassword && it.packageName != packageName }
+    }
+
+    /** The focused editable node under [root], looking at a bounded number of nodes. */
+    private fun focusedEditableIn(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        var looked = 0
+        while (queue.isNotEmpty() && looked++ < MAX_FOCUS_SEARCH) {
+            val node = queue.removeFirst()
+            if (node.isFocused && node.isEditable) return node
+            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
         }
+        return null
+    }
 
     private fun findKeyboardTop(): Int? {
         val bounds = Rect()
@@ -634,5 +655,8 @@ class BubbleService : AccessibilityService() {
 
     private companion object {
         const val REFRESH_DELAY_MS = 80L
+        val SETTLE_DELAYS_MS = longArrayOf(500L, 1500L)
+        /** Enough for a chat screen; a runaway tree is not worth the main thread. */
+        const val MAX_FOCUS_SEARCH = 500
     }
 }
