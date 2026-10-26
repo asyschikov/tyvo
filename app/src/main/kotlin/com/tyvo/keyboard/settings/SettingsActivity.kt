@@ -190,7 +190,7 @@ class SettingsActivity : ComponentActivity() {
                     // One button for the whole app rather than one per
                     // screen: the moment someone has something to say is
                     // rarely the moment they are looking at settings.
-                    FeedbackButton(settings)
+                    FeedbackButton()
                   }
                 }
             }

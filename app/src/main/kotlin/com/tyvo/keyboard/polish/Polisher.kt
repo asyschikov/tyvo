@@ -114,11 +114,6 @@ class Polisher(
             // Already every provider's default, but Mistral Large 4 rejects
             // temperature 0 with 400 unless top_p is stated as 1.
             put("top_p", 1)
-            // Gemini has always had this cap. Without it, a provider may hold
-            // the model's whole output limit against a tokens-per-minute
-            // budget, and Small 4's 20,000 on Mistral's free tier is gone
-            // in one request.
-            put("max_tokens", maxTokens(original))
             if (noReasoning) put("reasoning_effort", "none")
             put(
                 "messages",

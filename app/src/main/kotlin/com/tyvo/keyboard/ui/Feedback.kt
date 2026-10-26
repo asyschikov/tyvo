@@ -1,13 +1,12 @@
 package com.tyvo.keyboard.ui
 
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -15,19 +14,48 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tyvo.keyboard.BuildConfig
-import com.tyvo.keyboard.data.Settings
-import com.tyvo.keyboard.polish.Polisher
-import com.tyvo.keyboard.transcribe.Transcriber
 
-const val FEEDBACK_ADDRESS = "asyschikov+tyvo@gmail.com"
+/**
+ * A Google Form, and the entry ids of the setup questions it shares with
+ * the app. Each form numbers its own questions, so the ids are per form.
+ * The /d/<id>/viewform link redirects to the published form and keeps the
+ * pre-filled answers.
+ */
+private class FeedbackForm(
+    val id: String,
+    val version: Long,
+    val android: Long,
+    val manufacturer: Long,
+)
+
+private val BUG_REPORT = FeedbackForm(
+    id = "1b3lZvpWDCZQ2KqDI7KQoPvsjQpTRwoNk63MeAdgU_GQ",
+    version = 487671056,
+    android = 1764594464,
+    manufacturer = 1787080616,
+)
+
+private val FEEDBACK = FeedbackForm(
+    id = "16hSd9Hpq2vHe4jGMxEM6DBA_QzJZuFqy-IPEOziH-MU",
+    version = 487671056,
+    android = 1660114440,
+    manufacturer = 46482297,
+)
 
 /**
  * The feedback button, bottom-right of whichever screen is showing.
@@ -40,68 +68,54 @@ const val FEEDBACK_ADDRESS = "asyschikov+tyvo@gmail.com"
  * screen.
  */
 @Composable
-fun BoxScope.FeedbackButton(settings: Settings) {
+fun BoxScope.FeedbackButton() {
     val ctx = LocalContext.current
-    FloatingActionButton(
-        onClick = { sendFeedback(ctx, settings) },
-        modifier = Modifier
+    var open by remember { mutableStateOf(false) }
+    Box(
+        Modifier
             .align(Alignment.BottomEnd)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(20.dp),
     ) {
-        Icon(Icons.Outlined.MailOutline, contentDescription = "Send feedback")
+        FloatingActionButton(onClick = { open = true }) {
+            Icon(Icons.Outlined.MailOutline, contentDescription = "Send feedback")
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Submit bug report") },
+                onClick = { open = false; openForm(ctx, BUG_REPORT) },
+            )
+            DropdownMenuItem(
+                text = { Text("Submit feedback") },
+                onClick = { open = false; openForm(ctx, FEEDBACK) },
+            )
+        }
     }
 }
 
 /**
- * Opens a pre-addressed draft in whatever mail app the user has.
- *
- * Pre-fills the setup details that make a bug report answerable -- app
- * version, Android version, device, provider and models -- because asking
- * for them afterwards costs a round trip. Nothing dictated is included: the
+ * Opens [form] in the browser with the setup details already answered --
+ * app version, Android version, phone manufacturer -- because asking for
+ * them afterwards costs a round trip. Nothing dictated is included: the
  * transcripts are the private part, and a feedback button is no place to
  * leak them.
  */
-fun sendFeedback(ctx: Context, settings: Settings) {
-    val provider = settings.provider
-    val body = buildString {
-        append("\n\n\n---\n")
-        append("Tyvo ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
-        append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
-        append("${Build.MANUFACTURER} ${Build.MODEL}\n")
-        append("Provider: ${provider.label}\n")
-        append(
-            "Transcription: " +
-                settings.transcribeModel(provider)
-                    .ifBlank { Transcriber.defaultModelFor(provider) } + "\n"
+private fun openForm(ctx: Context, form: FeedbackForm) {
+    val uri = Uri.parse("https://docs.google.com/forms/d/${form.id}/viewform").buildUpon()
+        .appendQueryParameter("usp", "pp_url")
+        .appendQueryParameter(
+            "entry.${form.version}",
+            "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
         )
-        append(
-            "Clean-up: " +
-                if (!settings.polishEnabled) "off"
-                else settings.polishModel(provider)
-                    .ifBlank { Polisher.defaultModelFor(provider) }
+        .appendQueryParameter(
+            "entry.${form.android}",
+            "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
         )
-    }
-
-    val intent = Intent(Intent.ACTION_SENDTO).apply {
-        // SENDTO with a mailto: URI reaches mail apps only, so the chooser
-        // is not cluttered with every app that accepts plain text.
-        data = Uri.parse("mailto:")
-        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_ADDRESS))
-        putExtra(Intent.EXTRA_SUBJECT, "Tyvo feedback")
-        putExtra(Intent.EXTRA_TEXT, body)
-    }
-
+        .appendQueryParameter("entry.${form.manufacturer}", Build.MANUFACTURER)
+        .build()
     try {
-        ctx.startActivity(Intent.createChooser(intent, "Send feedback"))
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, uri))
     } catch (e: ActivityNotFoundException) {
-        // No mail app: leave the address somewhere the user can use it.
-        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("Tyvo feedback address", FEEDBACK_ADDRESS))
-        Toast.makeText(
-            ctx,
-            "No mail app found. Address copied: $FEEDBACK_ADDRESS",
-            Toast.LENGTH_LONG,
-        ).show()
+        Toast.makeText(ctx, "No browser found to open the form", Toast.LENGTH_LONG).show()
     }
 }

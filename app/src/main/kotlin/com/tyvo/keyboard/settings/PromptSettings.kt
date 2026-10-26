@@ -89,7 +89,6 @@ internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boo
     var text by remember { mutableStateOf(settings.cleanupSystemPrompt()) }
     var defaultChanged by remember { mutableStateOf(settings.cleanupDefaultChanged) }
     var showingDefault by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
     val built = remember { settings.builtCleanupPrompt() }
     val modified = saved.isNotBlank()
 
@@ -145,25 +144,7 @@ internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boo
             }
         }
 
-        // Collapsed until asked for: the full prompt is several screens long
-        // and would push everything below it out of reach.
-        if (!expanded) {
-            Text(
-                text,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
-            )
-            TextButton(onClick = { expanded = true }) { Text("Show and edit") }
-        } else {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 12,
-            )
+        PromptField(text, { text = it }, minLines = 12) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = text != settings.cleanupSystemPrompt(),
@@ -179,7 +160,6 @@ internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boo
                     onClick = { reset() },
                 ) { Text("Reset to default") }
             }
-            TextButton(onClick = { expanded = false }) { Text("Collapse") }
         }
 
         HorizontalDivider()
@@ -340,12 +320,11 @@ private fun ActionEditorDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                OutlinedTextField(
-                    value = instruction,
-                    onValueChange = { instruction = it },
-                    label = { Text("Instruction") },
-                    placeholder = { Text("What the button should do to your text") },
-                    modifier = Modifier.fillMaxWidth(),
+                PromptField(
+                    instruction,
+                    { instruction = it },
+                    label = "Instruction",
+                    placeholder = "What the button should do to your text",
                     minLines = 4,
                 )
                 if (!isCustom && builtIn != null && (edited || instruction != builtIn.instruction)) {
@@ -385,6 +364,52 @@ private fun ActionEditorDialog(
     )
 }
 
+/**
+ * Every editable prompt, shown the same way: a few lines until asked for,
+ * then the editor with Collapse both above and below it, so a long prompt
+ * can be folded away from either end without scrolling back. [below] sits
+ * under the editor, inside the expanded part (Save, Reset). Starts open
+ * when there is nothing to preview yet.
+ */
+@Composable
+internal fun PromptField(
+    text: String,
+    onChange: (String) -> Unit,
+    label: String? = null,
+    placeholder: String? = null,
+    minLines: Int = 4,
+    below: @Composable () -> Unit = {},
+) {
+    var expanded by remember { mutableStateOf(text.isBlank()) }
+    val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (!expanded) {
+            label?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
+            Text(
+                text,
+                style = mono,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = PREVIEW_LINES,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TextButton(onClick = { expanded = true }) { Text("Show and edit") }
+        } else {
+            TextButton(onClick = { expanded = false }) { Text("Collapse") }
+            OutlinedTextField(
+                value = text,
+                onValueChange = onChange,
+                label = label?.let { { Text(it) } },
+                placeholder = placeholder?.let { { Text(it) } },
+                textStyle = mono,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = minLines,
+            )
+            below()
+            TextButton(onClick = { expanded = false }) { Text("Collapse") }
+        }
+    }
+}
+
 @Composable
 internal fun ModifiedBadge(text: String) {
     Surface(
@@ -398,6 +423,9 @@ internal fun ModifiedBadge(text: String) {
         )
     }
 }
+
+/** Lines of a collapsed prompt: enough to recognise it. */
+private const val PREVIEW_LINES = 6
 
 /** Chips in the action bar stay readable at this length. */
 private const val MAX_LABEL = 14
