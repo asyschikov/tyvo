@@ -27,7 +27,27 @@ object FieldWriter {
         if (text.isNotEmpty() && text == node.hintText?.toString() &&
             node.textSelectionStart <= 0
         ) return ""
+        if (text.isNotEmpty() && node.textSelectionStart < 0 && !holdsText(node, text.length)) {
+            return ""
+        }
         return text
+    }
+
+    /**
+     * Whether a field that reports [length] characters but no cursor really
+     * holds them.
+     *
+     * Telegram and WhatsApp report their empty message box as the text
+     * "Message", with no hint, no showing-hint flag and no cursor, so the
+     * placeholder reads exactly like typed text and dictation landed after
+     * it. Asking for the cursor after the last character tells them apart
+     * without guessing from the words: a box holding real text puts it
+     * there, an empty one has nothing to put it after.
+     */
+    private fun holdsText(node: AccessibilityNodeInfo, length: Int): Boolean {
+        select(node, length, length)
+        node.refresh()
+        return Splice.cursorConfirms(length, node.textSelectionStart, node.textSelectionEnd)
     }
 
     /** Inserts [text] at the field's cursor. Null if nothing was written. */

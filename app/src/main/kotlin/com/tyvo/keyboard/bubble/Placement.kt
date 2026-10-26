@@ -78,4 +78,12 @@ object Splice {
 
     private fun holds(current: String, at: Placement): Boolean =
         at.end <= current.length && current.substring(at.start, at.end) == at.text
+
+    /**
+     * Whether a field answered a request for the cursor at [length] by
+     * putting it there. Kept apart from the accessibility calls so the rule
+     * itself can be tested.
+     */
+    fun cursorConfirms(length: Int, selStart: Int, selEnd: Int): Boolean =
+        selStart == length && selEnd == length
 }

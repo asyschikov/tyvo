@@ -23,3 +23,7 @@ keystore.properties
 research/**/__pycache__/
 # Raw eval outputs: regenerate with the harness; the scores live in stats.md.
 research/cleanup-eval/results/
+
+# Working notes for Play Console chores and other admin: checklists, scripts
+# for things only a human can do. Not part of the app.
+/admin-todo/

@@ -4,6 +4,8 @@ import com.tyvo.keyboard.bubble.Placement
 import com.tyvo.keyboard.bubble.Splice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SpliceTest {
@@ -61,5 +63,18 @@ class SpliceTest {
     @Test
     fun `remove declines once the user has edited our text`() {
         assertNull(Splice.remove("Hi there how are YOU?", Placement(8, " how are you?")))
+    }
+
+    @Test
+    fun `a field holding its text takes the cursor at the end`() {
+        assertTrue(Splice.cursorConfirms(7, 7, 7))
+    }
+
+    @Test
+    fun `a placeholder-only field cannot take a cursor after its text`() {
+        // Telegram's empty box reports "Message" with no cursor; asked for
+        // one at 7 it has nothing to put it after.
+        assertFalse(Splice.cursorConfirms(7, -1, -1))
+        assertFalse(Splice.cursorConfirms(7, 0, 0))
     }
 }
