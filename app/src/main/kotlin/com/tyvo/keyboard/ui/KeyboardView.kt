@@ -284,7 +284,11 @@ class KeyboardView(context: Context) : LinearLayout(context) {
                 // No preview of the text: it is already in the field.
                 setStatus(
                     state.note?.let { if (state.busy) "$it…" else it },
-                    if (state.busy) c.fgDim else c.warn,
+                    when {
+                        state.busy -> c.fgDim
+                        state.failed -> c.rec
+                        else -> c.warn
+                    },
                 )
                 waveform.visibility = GONE
                 micButton.text = "Speak"
@@ -336,7 +340,14 @@ class KeyboardView(context: Context) : LinearLayout(context) {
             is UiState.Review -> {
                 // Visible only between the text landing and the switch back
                 // to the previous keyboard.
-                setStatus(state.note, if (state.busy) c.fgDim else c.warn)
+                setStatus(
+                    state.note,
+                    when {
+                        state.busy -> c.fgDim
+                        state.failed -> c.rec
+                        else -> c.warn
+                    },
+                )
                 waveform.visibility = GONE
                 compactMic.text = "Hold to talk"
                 compactMic.background = roundedDrawable(c.accent, dp(14).toFloat())

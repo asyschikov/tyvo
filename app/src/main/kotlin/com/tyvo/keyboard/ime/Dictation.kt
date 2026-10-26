@@ -107,8 +107,11 @@ class Dictation(
                 polisher.cleanUp(raw)
             } catch (e: TyvoException) {
                 // Clean-up failed, but the words are good: insert them
-                // rather than making the user dictate again.
-                return Result.Text(raw, raw, note = e.message)
+                // rather than making the user dictate again, and say so
+                // everywhere the text shows up, History included.
+                val why = "Clean-up failed: ${e.message ?: "unknown error"}"
+                recordingId?.let { store.markCleanupFailed(it, why) }
+                return Result.Text(raw, raw, note = why)
             }
             if (polished != raw) {
                 recordingId?.let { store.updateText(it, polished) }

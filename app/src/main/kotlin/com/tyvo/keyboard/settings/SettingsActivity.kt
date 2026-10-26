@@ -527,19 +527,10 @@ private fun SettingsScreen(
                     }
 
                     Text(
-                        "Only worth setting if you dictate in one language. OpenAI " +
-                            "honours it; Mistral detects the language itself and appears " +
-                            "to ignore it.",
+                        "A hint only: some models ignore it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (lang.isBlank()) {
-                        Text(
-                            "Detection handled every case tested, down to single words.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
 
                 // ---- vocabulary ----------------------------------------------------

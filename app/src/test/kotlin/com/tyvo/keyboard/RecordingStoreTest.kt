@@ -270,4 +270,27 @@ class RecordingStoreTest {
         assertEquals("polished text", reloaded.text)
         assertNull(reloaded.audioFile)
     }
+
+    @Test
+    fun `a failed clean-up is kept with the transcript, not as a failed row`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markDone(rec.id, "i love tyvo")
+        store.markCleanupFailed(rec.id, "Clean-up failed: Rate limited")
+
+        val reloaded = store.get(rec.id)!!
+        assertEquals(Recording.Status.DONE, reloaded.status)
+        assertEquals("i love tyvo", reloaded.text)
+        assertEquals("Clean-up failed: Rate limited", reloaded.cleanupError)
+        assertFalse(reloaded.needsAttention)
+    }
+
+    @Test
+    fun `a later clean-up clears the failure`() {
+        val rec = store.addPending(wav(), 1000)
+        store.markDone(rec.id, "i love tyvo")
+        store.markCleanupFailed(rec.id, "Clean-up failed: Rate limited")
+        store.updateText(rec.id, "I love Tyvo.")
+
+        assertNull(store.get(rec.id)!!.cleanupError)
+    }
 }

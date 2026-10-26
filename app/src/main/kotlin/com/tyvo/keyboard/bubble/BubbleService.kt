@@ -379,7 +379,8 @@ class BubbleService : AccessibilityService() {
         session.begin(transcript)
         if (transcript != text) session.setPolished(text)
         haptic()
-        render(reviewOrIdle(note = note))
+        // The only note a fresh dictation carries is a failed clean-up.
+        render(reviewOrIdle(note = note, failed = note != null))
     }
 
     /**
@@ -478,9 +479,9 @@ class BubbleService : AccessibilityService() {
                 if (replacePlaced(result)) session.setVariant(result, action.id)
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(reviewOrIdle(note = e.message))
+                render(reviewOrIdle(note = e.message, failed = true))
             } catch (e: Exception) {
-                render(reviewOrIdle(note = "Rewrite failed."))
+                render(reviewOrIdle(note = "Rewrite failed.", failed = true))
             }
         }
     }
@@ -497,9 +498,9 @@ class BubbleService : AccessibilityService() {
                 if (replacePlaced(polished)) session.setPolished(polished)
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(reviewOrIdle(note = e.message))
+                render(reviewOrIdle(note = "Clean-up failed: ${e.message}", failed = true))
             } catch (e: Exception) {
-                render(reviewOrIdle(note = "Clean-up failed."))
+                render(reviewOrIdle(note = "Clean-up failed.", failed = true))
             }
         }
     }
@@ -549,7 +550,11 @@ class BubbleService : AccessibilityService() {
         }
     }
 
-    private fun reviewOrIdle(note: String? = null, busy: Boolean = false): UiState =
+    private fun reviewOrIdle(
+        note: String? = null,
+        busy: Boolean = false,
+        failed: Boolean = false,
+    ): UiState =
         if (session.isActive) {
             UiState.Review(
                 text = session.current,
@@ -559,6 +564,7 @@ class BubbleService : AccessibilityService() {
                 activeAction = session.activeAction,
                 busy = busy,
                 note = note,
+                failed = failed,
             )
         } else {
             UiState.Idle(note ?: "Text is no longer editable here.")

@@ -135,10 +135,12 @@ class BubbleView(
         if (state is UiState.Working) drawSpinner(canvas, cx, cy, glyph)
 
         // A dot marks text that can still be edited: the only hint that a
-        // long press does something.
+        // long press does something. Red when something failed, such as
+        // clean-up, so the bubble never looks like it succeeded.
         val dot = when {
+            (state as? UiState.Review)?.failed == true -> c.rec
             state is UiState.Review -> c.onAccent
-            (state as? UiState.Idle)?.lastError != null -> c.warn
+            (state as? UiState.Idle)?.lastError != null -> c.rec
             else -> null
         }
         if (dot != null) {

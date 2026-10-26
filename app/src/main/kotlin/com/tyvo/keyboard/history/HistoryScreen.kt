@@ -163,6 +163,15 @@ private fun RecordingRow(
                 )
             }
 
+            // Not a failed row: the words are there, just not cleaned up.
+            rec.cleanupError?.let {
+                Text(
+                    "${it.trimEnd('.', ' ')}. Kept as spoken.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             rec.error?.let {
                 Text(
                     if (rec.attempts > 1) "$it  (${rec.attempts} attempts)" else it,

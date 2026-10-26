@@ -20,6 +20,11 @@ data class Recording(
     /** Why the last attempt failed, for display on a failed row. */
     val error: String? = null,
     val attempts: Int = 0,
+    /**
+     * Why clean-up failed, when it did: [text] is then the transcript as
+     * spoken. Cleared once a clean-up succeeds.
+     */
+    val cleanupError: String? = null,
 ) {
     enum class Status {
         /** Captured, not yet transcribed. Audio is on disk. */

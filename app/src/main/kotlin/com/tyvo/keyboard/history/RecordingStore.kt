@@ -72,6 +72,7 @@ class RecordingStore(baseDir: File) {
                     text = text,
                     audioFile = null,
                     error = null,
+                    cleanupError = null,
                 ) else it
             }
         )
@@ -92,7 +93,12 @@ class RecordingStore(baseDir: File) {
 
     /** Updates the stored text of an already-transcribed recording. */
     fun updateText(id: String, text: String) = synchronized(lock) {
-        write(read().map { if (it.id == id) it.copy(text = text) else it })
+        write(read().map { if (it.id == id) it.copy(text = text, cleanupError = null) else it })
+    }
+
+    /** Notes that clean-up failed, so the stored text is the raw transcript. */
+    fun markCleanupFailed(id: String, error: String) = synchronized(lock) {
+        write(read().map { if (it.id == id) it.copy(cleanupError = error) else it })
     }
 
     fun delete(id: String) = synchronized(lock) {
@@ -266,6 +272,7 @@ class RecordingStore(baseDir: File) {
         put("durationMs", r.durationMs)
         r.error?.let { put("error", it) }
         put("attempts", r.attempts)
+        r.cleanupError?.let { put("cleanupError", it) }
     }
 
     private fun fromJson(o: JSONObject): Recording? {
@@ -282,6 +289,7 @@ class RecordingStore(baseDir: File) {
             durationMs = o.optLong("durationMs"),
             error = o.optString("error").takeIf { it.isNotBlank() },
             attempts = o.optInt("attempts"),
+            cleanupError = o.optString("cleanupError").takeIf { it.isNotBlank() },
         )
     }
 }

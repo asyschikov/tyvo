@@ -42,6 +42,8 @@ sealed interface UiState {
         val activeAction: String? = null,
         val busy: Boolean = false,
         val note: String? = null,
+        /** [note] reports a failure (clean-up, a rewrite): shown in red. */
+        val failed: Boolean = false,
     ) : UiState
 }
 

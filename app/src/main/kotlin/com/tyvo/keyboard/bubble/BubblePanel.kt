@@ -85,7 +85,13 @@ class BubblePanel(context: Context) : LinearLayout(context) {
         val note = state.note?.let { if (state.busy) "$it…" else it }
         status.visibility = if (note.isNullOrBlank()) GONE else VISIBLE
         status.text = note
-        status.setTextColor(if (state.busy) c.fgDim else c.warn)
+        status.setTextColor(
+            when {
+                state.busy -> c.fgDim
+                state.failed -> c.rec
+                else -> c.warn
+            }
+        )
         undoButton.visibility = if (state.canUndo) VISIBLE else GONE
 
         val enabled = !state.busy

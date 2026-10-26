@@ -190,7 +190,7 @@ class TyvoInputMethodService : InputMethodService() {
             pendingInsert = null
             commitFresh(pending.text, transcript = pending.raw)
             // Voice subtype mode is dictate-and-return.
-            if (voiceMode) switchAway() else render(reviewOrIdle(note = pending.note))
+            if (voiceMode) switchAway() else render(reviewOrIdle(note = pending.note, failed = pending.note != null))
         } else if (pipeline?.isActive != true) {
             // Mid-transcription the status line is still telling the truth.
             render(stateForIdle())
@@ -373,7 +373,7 @@ class TyvoInputMethodService : InputMethodService() {
                         // Voice subtype mode is dictate-and-return: the text
                         // lands, the keyboard goes back to the one that
                         // launched it.
-                        if (voiceMode) switchAway() else render(reviewOrIdle(note = result.note))
+                        if (voiceMode) switchAway() else render(reviewOrIdle(note = result.note, failed = result.note != null))
                     }
                 }
                 Dictation.Result.NothingHeard -> {
@@ -450,9 +450,9 @@ class TyvoInputMethodService : InputMethodService() {
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(reviewOrIdle(note = e.message))
+                render(reviewOrIdle(note = e.message, failed = true))
             } catch (e: Exception) {
-                render(reviewOrIdle(note = "Rewrite failed."))
+                render(reviewOrIdle(note = "Rewrite failed.", failed = true))
             }
         }
     }
@@ -477,9 +477,9 @@ class TyvoInputMethodService : InputMethodService() {
                 }
                 render(reviewOrIdle())
             } catch (e: TyvoException) {
-                render(reviewOrIdle(note = e.message))
+                render(reviewOrIdle(note = "Clean-up failed: ${e.message}", failed = true))
             } catch (e: Exception) {
-                render(reviewOrIdle(note = "Clean-up failed."))
+                render(reviewOrIdle(note = "Clean-up failed.", failed = true))
             }
         }
     }
@@ -712,7 +712,11 @@ class TyvoInputMethodService : InputMethodService() {
      * every edit so a session invalidated mid-flight collapses gracefully
      * instead of offering actions that would do nothing.
      */
-    private fun reviewOrIdle(note: String? = null, busy: Boolean = false): UiState =
+    private fun reviewOrIdle(
+        note: String? = null,
+        busy: Boolean = false,
+        failed: Boolean = false,
+    ): UiState =
         if (session.isActive) {
             UiState.Review(
                 text = session.current,
@@ -722,6 +726,7 @@ class TyvoInputMethodService : InputMethodService() {
                 activeAction = session.activeAction,
                 busy = busy,
                 note = note,
+                failed = failed,
             )
         } else {
             UiState.Idle(note ?: "Text is no longer editable here.")
