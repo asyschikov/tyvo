@@ -89,6 +89,7 @@ internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boo
     var text by remember { mutableStateOf(settings.cleanupSystemPrompt()) }
     var defaultChanged by remember { mutableStateOf(settings.cleanupDefaultChanged) }
     var showingDefault by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val built = remember { settings.builtCleanupPrompt() }
     val modified = saved.isNotBlank()
 
@@ -144,27 +145,41 @@ internal fun CleanupPromptEditor(settings: Settings, onChanged: (overridden: Boo
             }
         }
 
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 12,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                enabled = text != settings.cleanupSystemPrompt(),
-                onClick = {
-                    settings.saveCleanupPrompt(text)
-                    saved = settings.cleanupPrompt
-                    defaultChanged = settings.cleanupDefaultChanged
-                    onChanged(saved.isNotBlank())
-                },
-            ) { Text("Save") }
-            OutlinedButton(
-                enabled = modified || text != built,
-                onClick = { reset() },
-            ) { Text("Reset to default") }
+        // Collapsed until asked for: the full prompt is several screens long
+        // and would push everything below it out of reach.
+        if (!expanded) {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TextButton(onClick = { expanded = true }) { Text("Show and edit") }
+        } else {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 12,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = text != settings.cleanupSystemPrompt(),
+                    onClick = {
+                        settings.saveCleanupPrompt(text)
+                        saved = settings.cleanupPrompt
+                        defaultChanged = settings.cleanupDefaultChanged
+                        onChanged(saved.isNotBlank())
+                    },
+                ) { Text("Save") }
+                OutlinedButton(
+                    enabled = modified || text != built,
+                    onClick = { reset() },
+                ) { Text("Reset to default") }
+            }
+            TextButton(onClick = { expanded = false }) { Text("Collapse") }
         }
 
         HorizontalDivider()
@@ -220,16 +235,27 @@ internal fun QuickActionsEditor(settings: Settings) {
                     a.group == QuickAction.Group.CUSTOM -> ModifiedBadge("Yours")
                     a.id in edits -> ModifiedBadge("Edited")
                 }
+                if (a.group == QuickAction.Group.CUSTOM) {
+                    TextButton(onClick = {
+                        settings.customActions = settings.customActions.filter { it.id != a.id }
+                        refresh()
+                    }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                } else {
+                    TextButton(onClick = {
+                        settings.removedActions = settings.removedActions + a.id
+                        refresh()
+                    }) { Text("Hide") }
+                }
             }
         }
         TextButton(onClick = { editing = QuickActions.custom("", "", "") }) { Text("+ New action") }
 
-        // Removed built-ins stay listed, so taking one off the bar is never
+        // Hidden built-ins stay listed, so taking one off the bar is never
         // a decision that cannot be undone from here.
         val gone = QuickActions.ALL.filter { it.id in removed }
         if (gone.isNotEmpty()) {
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
-            Text("Removed", style = MaterialTheme.typography.labelLarge)
+            Text("Hidden", style = MaterialTheme.typography.labelLarge)
             gone.forEach { a ->
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -244,7 +270,7 @@ internal fun QuickActionsEditor(settings: Settings) {
                     TextButton(onClick = {
                         settings.removedActions = settings.removedActions - a.id
                         refresh()
-                    }) { Text("Restore") }
+                    }) { Text("Show") }
                 }
             }
         }
@@ -346,12 +372,12 @@ private fun ActionEditorDialog(
                         onChanged()
                     }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
                 }
-                // A built-in is only hidden: it can be restored from the list.
+                // A built-in is only hidden: it can be shown again from the list.
                 if (!isCustom && builtIn != null) {
                     TextButton(onClick = {
                         settings.removedActions = settings.removedActions + action.id
                         onChanged()
-                    }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                    }) { Text("Hide") }
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
