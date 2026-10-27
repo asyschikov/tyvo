@@ -8,9 +8,11 @@ reshape it without leaving the keyboard. Free, fully private, and open source, B
 Say "I am going to cook pasta, sorry no, lasagna" — the field gets
 "I am going to cook lasagna."
 
-There is no server and no subscription: Tyvo talks to your AI provider and
+There is no server and no subscription: Tyvo talks to your favorite AI provider and
 nothing else. Bring your own key and pay the provider per second of audio —
 a heavy day costs cents, a quiet week costs nothing.
+
+Featuring: Mistral Voxtral 3, incredible accuracy for $0.24/hr.
 
 ## Features
 
